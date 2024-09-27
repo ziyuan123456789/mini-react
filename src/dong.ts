@@ -13,7 +13,7 @@ declare namespace JSX {
 
 function createElement(type: string, props: any, ...children: any[]): any {
     return {
-        _fromCustomRenderer: true, // 特殊标记，证明是自定义的 createElement 编译的
+        _fromCustomRenderer: true,
         type,
         props: {
             ...props,
@@ -40,17 +40,20 @@ function createTextElement(text: string): any {
 let nextFiberReconcileWork: any = null;
 let wipRoot: any = null;
 
+//工作循环
 function workLoop(deadline: IdleDeadline): void {
+    //是否让出
     let shouldYield = false;
+    //当存在下一个work并且允许继续运行
     while (nextFiberReconcileWork && !shouldYield) {
         nextFiberReconcileWork = performNextWork(nextFiberReconcileWork);
+        //当空闲时间耗尽
         shouldYield = deadline.timeRemaining() < 1;
     }
 
     if (!nextFiberReconcileWork && wipRoot) {
         commitRoot();
     }
-
     requestIdleCallback(workLoop);
 }
 
@@ -82,34 +85,40 @@ function performNextWork(fiber: any): any {
     }
     return null;
 }
-
+//协调
 function reconcile(fiber: any): void {
+    //如果fiber节点不存在dom,比如说还没有遍历到这个节点或者第一次渲染
     if (!fiber.dom) {
+        console.log(fiber)
+        //给他创建一份
         fiber.dom = createDom(fiber);
     }
+    //协调子元素
     reconcileChildren(fiber, fiber.props.children);
 }
 
 function reconcileChildren(wipFiber: any, elements: any[]): void {
     let index = 0;
     let prevSibling: any = null;
-
+    //进行循环遍历
     while (index < elements.length) {
+        //遍历子元素,获取元素
         const element = elements[index];
+        //创建一个新的fiber节点
         const newFiber: any = {
             type: element.type,
             props: element.props,
             dom: null,
-            return: wipFiber,
+            return: wipFiber, //前驱指针
             effectTag: "PLACEMENT",
         };
 
         if (index === 0) {
+            //第一个元素
             wipFiber.child = newFiber;
         } else {
             prevSibling.sibling = newFiber;
         }
-
         prevSibling = newFiber;
         index++;
     }
@@ -139,47 +148,63 @@ function commitWork(fiber: any): void {
     commitWork(fiber.sibling);
 }
 
+//创建真实DOM
 function createDom(fiber: any): HTMLElement | Text {
+    //判断一下类型,如果文本就创建文本节点
     const dom =
         fiber.type == "TEXT_ELEMENT"
             ? document.createTextNode(fiber.props.nodeValue)
             : document.createElement(fiber.type);
 
     for (const prop in fiber.props) {
+        //进行属性设置
         setAttribute(dom, prop, fiber.props[prop]);
     }
 
     return dom;
 }
-
+//检测是否为监听器?
 function isEventListenerAttr(key: string, value: any): boolean {
     return typeof value == 'function' && key.startsWith('on');
 }
-
+//检测是不是要添加style
 function isStyleAttr(key: string, value: any): boolean {
     return key == 'style' && typeof value == 'object';
 }
-
+//是一个普通属性吗
 function isPlainAttr(_key: string, value: any): boolean {
     return typeof value != 'object' && typeof value != 'function';
 }
 
 const setAttribute = (dom: HTMLElement, key: string, value: any): void => {
+    // 1. 如果属性名是 'children'，直接返回，不做任何处理
     if (key === 'children') {
         return;
     }
 
+    // 2. 如果属性名是 'nodeValue'，表示这是文本节点，直接设置元素的 textContent 为该值
     if (key === 'nodeValue') {
         dom.textContent = value;
-    } else if (isEventListenerAttr(key, value)) {
+    }
+    // 3. 检查属性是否为事件监听器
+    else if (isEventListenerAttr(key, value)) {
+        // 如果是事件监听器，获取事件类型（去掉 'on' 前缀并转换为小写）
         const eventType = key.slice(2).toLowerCase();
+        // 为该 DOM 元素添加相应的事件监听器
         dom.addEventListener(eventType, value);
-    } else if (isStyleAttr(key, value)) {
+    }
+    // 4. 检查属性是否是样式属性（style）
+    else if (isStyleAttr(key, value)) {
+        // 如果是样式对象，将样式对象的属性应用到 DOM 元素的 style 上
         Object.assign(dom.style, value);
-    } else if (isPlainAttr(key, value)) {
+    }
+    // 5. 检查属性是否是普通属性
+    else if (isPlainAttr(key, value)) {
+        // 如果是普通属性，使用 setAttribute 将属性和值设置到 DOM 元素上
         dom.setAttribute(key, value);
     }
 };
+
 
 
 const Dong = {
