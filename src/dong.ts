@@ -1,15 +1,3 @@
-declare namespace JSX {
-    interface IntrinsicElements {
-        div: any;
-        h1: any;
-        p: any;
-        ul: any;
-        li: any;
-        span: any;
-    }
-}
-
-
 
 function createElement(type: string, props: any, ...children: any[]): any {
     return {
@@ -37,6 +25,12 @@ function createTextElement(text: string): any {
 
 let nextFiberReconcileWork: any = null;
 let wipRoot: any = null;
+let currentRoot: any = null; // 跟踪当前根节点
+let deletions: any[] = [];
+
+let currentFiber: any = null; // 当前工作的 fiber
+let hookIndex = 0; // 用于追踪当前 hook 的索引
+
 
 //工作循环
 function workLoop(deadline: IdleDeadline): void {
@@ -57,18 +51,22 @@ function workLoop(deadline: IdleDeadline): void {
 
 requestIdleCallback(workLoop);
 
-function render(element: any, container: HTMLElement): void {
 
+export function render(element: any, container: HTMLElement): void {
     wipRoot = {
         dom: container,
         props: {
             children: [element],
-        }
+        },
+        alternate: currentRoot // 将 alternate 设置为 currentRoot
     };
     nextFiberReconcileWork = wipRoot;
 }
 
 function performNextWork(fiber: any): any {
+    currentFiber = fiber;  // 设置当前工作的 fiber
+    hookIndex = 0;  // 重置 hook 的索引
+    fiber.hooks = [];  // 初始化 hooks 数组
     //协调
     reconcile(fiber);
 
@@ -92,50 +90,92 @@ function performNextWork(fiber: any): any {
 
 //协调
 function reconcile(fiber: any): void {
-    //如果fiber节点不存在dom,比如说还没有遍历到这个节点或者第一次渲染
-    if (!fiber.dom) {
-        console.log(fiber)
-        //给他创建一份
-        fiber.dom = createDom(fiber);
+    if (typeof fiber.type === 'function') {
+        // 执行这个函数 并将返回的 JSX 结构作为新的子元素
+        const child = fiber.type(fiber.props);
+        reconcileChildren(fiber, [child]); // 处理函数组件返回的子元素
+    } else {
+        // 如果 fiber 不是函数式组件，就直接创建 DOM
+        //如果fiber节点不存在dom,比如说还没有遍历到这个节点或者第一次渲染
+        if (!fiber.dom) {
+            //给他创建一份
+            fiber.dom = createDom(fiber);
+        }
+        //协调子元素
+        reconcileChildren(fiber, fiber.props.children);
     }
-    //协调子元素
-    reconcileChildren(fiber, fiber.props.children);
 }
 
 //协调子元素
 function reconcileChildren(wipFiber: any, elements: any[]): void {
     let index = 0;
     let prevSibling: any = null;
+
+    // 获取上一次渲染时的 Fiber 树
+    let oldFiber = wipFiber.alternate && wipFiber.alternate.child;
     //进行循环遍历
-    while (index < elements.length) {
+    while (index < elements.length || oldFiber != null) {
         //遍历子元素,获取元素
         const element = elements[index];
-        //创建一个新的fiber节点
-        const newFiber: any = {
-            type: element.type,
-            props: element.props,
-            dom: null,
-            return: wipFiber, //前驱指针
-            effectTag: "PLACEMENT",
-        };
+        let newFiber = null;
+
+        const sameType = oldFiber && element && element.type === oldFiber.type;
+
+        if (sameType) {
+            // 如果类型相同，则复用旧的 Fiber 节点，并更新属性
+            newFiber = {
+                type: oldFiber.type,
+                props: element.props,
+                dom: oldFiber.dom,
+                return: wipFiber,
+                alternate: oldFiber,
+                effectTag: "UPDATE",
+            };
+        } else {
+            if (element) {
+                // 如果类型不同，创建新的 Fiber 节点
+                newFiber = {
+                    type: element.type,
+                    props: element.props,
+                    dom: null,
+                    return: wipFiber,
+                    alternate: null,
+                    effectTag: "PLACEMENT",
+                };
+            }
+
+            if (oldFiber) {
+                // 如果类型不同，还要标记旧的 Fiber 节点为删除
+                oldFiber.effectTag = "DELETION";
+                deletions.push(oldFiber);
+            }
+        }
+
+        if (oldFiber) {
+            oldFiber = oldFiber.sibling;
+        }
 
         if (index === 0) {
-            //第一个元素,配置子元素
             wipFiber.child = newFiber;
-        } else {
-            //配置兄弟元素,这一点其实非常重要,在常规深搜中是不能感知同层级兄弟节点的
+        } else if (prevSibling) {
             prevSibling.sibling = newFiber;
         }
-        //配置下一个
+
         prevSibling = newFiber;
         index++;
     }
 }
 
-function commitRoot(): void {
+function commitRoot() {
+    // 首先处理需要删除的节点
+    deletions.forEach(commitWork);
+    deletions = []; // 清空删除列表
+
     commitWork(wipRoot.child);
+    currentRoot = wipRoot; // 在提交后更新 currentRoot
     wipRoot = null;
 }
+
 
 function commitWork(fiber: any): void {
     if (!fiber) {
@@ -150,6 +190,10 @@ function commitWork(fiber: any): void {
     const domParent = domParentFiber.dom;
     if (fiber.effectTag === "PLACEMENT" && fiber.dom != null) {
         domParent.appendChild(fiber.dom);
+    } else if (fiber.effectTag === "UPDATE" && fiber.dom != null) {
+        updateDom(fiber.dom, fiber.alternate.props, fiber.props);
+    } else if (fiber.effectTag === "DELETION") {
+        domParent.removeChild(fiber.dom);
     }
 
     commitWork(fiber.child);
@@ -212,12 +256,108 @@ const setAttribute = (dom: HTMLElement, key: string, value: any): void => {
         dom.setAttribute(key, value);
     }
 };
+function updateDom(dom: HTMLElement | Text, prevProps: any, nextProps: any) {
+    console.log("==")
+    // 1. 处理文本节点
+    if (dom instanceof Text) {
+        if (prevProps.nodeValue !== nextProps.nodeValue) {
+            dom.nodeValue = nextProps.nodeValue;
+        }
+        return;
+    }
 
+    // 2. 移除旧的或改变的事件监听器
+    Object.keys(prevProps)
+        .filter(isEventListenerAttr)
+        .forEach(name => {
+            const eventType = name.toLowerCase().substring(2);
+            if (!(name in nextProps) || prevProps[name] !== nextProps[name]) {
+                dom.removeEventListener(eventType, prevProps[name]);
+            }
+        });
+
+    // 3. 移除旧的属性
+    Object.keys(prevProps)
+        .filter(isPlainAttr)
+        .forEach(name => {
+            if (!(name in nextProps)) {
+                dom.removeAttribute(name);
+            }
+        });
+
+    // 4. 设置新的或改变的事件监听器
+    Object.keys(nextProps)
+        .filter(isEventListenerAttr)
+        .forEach(name => {
+            const eventType = name.toLowerCase().substring(2);
+            if (!(name in prevProps) || prevProps[name] !== nextProps[name]) {
+                dom.addEventListener(eventType, nextProps[name]);
+            }
+        });
+
+    // 5. 设置新的属性
+    Object.keys(nextProps)
+        .filter(isPlainAttr)
+        .forEach(name => {
+            if (prevProps[name] !== nextProps[name]) {
+                dom.setAttribute(name, nextProps[name]);
+            }
+        });
+
+    // 6. 更新样式属性
+    if (prevProps.style) {
+        Object.keys(prevProps.style).forEach(key => {
+            if (!nextProps.style || !(key in nextProps.style)) {
+                dom.style[key] = "";
+            }
+        });
+    }
+
+    if (nextProps.style) {
+        Object.keys(nextProps.style).forEach(key => {
+            if (!prevProps.style || prevProps.style[key] !== nextProps.style[key]) {
+                dom.style[key] = nextProps.style[key];
+            }
+        });
+    }
+}
+export function useState(initialValue: any) {
+    const oldHook =
+        currentFiber.alternate && currentFiber.alternate.hooks
+            ? currentFiber.alternate.hooks[hookIndex]
+            : null;
+
+    const hook = {
+        state: oldHook ? oldHook.state : initialValue,
+        queue: oldHook ? oldHook.queue : []
+    };
+
+    // 处理队列中的所有动作
+    hook.queue.forEach((action: (arg0: any) => any) => {
+        hook.state = action(hook.state);
+    });
+
+    const setState = (action: any) => {
+        hook.queue.push(typeof action === 'function' ? action : () => action);
+        wipRoot = {
+            dom: currentRoot.dom,
+            props: currentRoot.props,
+            alternate: currentRoot
+        };
+        nextFiberReconcileWork = wipRoot;
+        requestIdleCallback(workLoop);
+    };
+
+    currentFiber.hooks.push(hook);
+    hookIndex++;
+    return [hook.state, setState];
+}
 
 
 const Dong = {
     createElement,
     render,
+    useState
 };
 
 export default Dong;
