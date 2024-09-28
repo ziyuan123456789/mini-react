@@ -13,7 +13,6 @@ declare namespace JSX {
 
 function createElement(type: string, props: any, ...children: any[]): any {
     return {
-        _fromCustomRenderer: true,
         type,
         props: {
             ...props,
@@ -28,7 +27,6 @@ function createElement(type: string, props: any, ...children: any[]): any {
 
 function createTextElement(text: string): any {
     return {
-        _fromCustomRenderer: true,
         type: "TEXT_ELEMENT",
         props: {
             nodeValue: text,
@@ -60,6 +58,7 @@ function workLoop(deadline: IdleDeadline): void {
 requestIdleCallback(workLoop);
 
 function render(element: any, container: HTMLElement): void {
+
     wipRoot = {
         dom: container,
         props: {
@@ -70,21 +69,27 @@ function render(element: any, container: HTMLElement): void {
 }
 
 function performNextWork(fiber: any): any {
+    //协调
     reconcile(fiber);
 
+    //返回指向下一个的fiber
     if (fiber.child) {
         return fiber.child;
     }
 
+    //如果没有子节点,就找兄弟节点
     let nextFiber = fiber;
     while (nextFiber) {
         if (nextFiber.sibling) {
             return nextFiber.sibling;
         }
+        //没有兄弟节点就回溯到父节点 继续找兄弟节点
         nextFiber = nextFiber.return;
     }
+    //当回溯到根节点的时候,说明已经遍历完成
     return null;
 }
+
 //协调
 function reconcile(fiber: any): void {
     //如果fiber节点不存在dom,比如说还没有遍历到这个节点或者第一次渲染
@@ -97,6 +102,7 @@ function reconcile(fiber: any): void {
     reconcileChildren(fiber, fiber.props.children);
 }
 
+//协调子元素
 function reconcileChildren(wipFiber: any, elements: any[]): void {
     let index = 0;
     let prevSibling: any = null;
@@ -114,11 +120,13 @@ function reconcileChildren(wipFiber: any, elements: any[]): void {
         };
 
         if (index === 0) {
-            //第一个元素
+            //第一个元素,配置子元素
             wipFiber.child = newFiber;
         } else {
+            //配置兄弟元素,这一点其实非常重要,在常规深搜中是不能感知同层级兄弟节点的
             prevSibling.sibling = newFiber;
         }
+        //配置下一个
         prevSibling = newFiber;
         index++;
     }
