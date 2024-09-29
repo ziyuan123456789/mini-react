@@ -1,3 +1,4 @@
+//暴露接口给Babel,在vite.config文件里指定这个方法为处理器,避免手动的显示调用
 function createElement(type: string, props: any, ...children: any[]): any {
     if (type == undefined) {
         console.error("ERROR")
@@ -26,6 +27,7 @@ function createElement(type: string, props: any, ...children: any[]): any {
     };
 }
 
+//进行文本节点处理,给予一个简单的TEXT_ELEMENT标记
 function createTextElement(text: string): any {
     return {
         type: "TEXT_ELEMENT",
@@ -36,6 +38,7 @@ function createTextElement(text: string): any {
     };
 }
 
+
 let nextFiberReconcileWork: any = null;
 let wipRoot: any = null;
 let currentRoot: any = null; // 跟踪当前根节点
@@ -43,27 +46,6 @@ let deletions: any[] = [];
 
 let currentFiber: any = null; // 当前工作的 fiber
 let hookIndex = 0; // 用于追踪当前 hook 的索引
-
-
-//工作循环
-function workLoop(deadline: IdleDeadline): void {
-    //是否让出
-    let shouldYield = false;
-    //当存在下一个work并且允许继续运行
-    while (nextFiberReconcileWork && !shouldYield) {
-        nextFiberReconcileWork = performNextWork(nextFiberReconcileWork);
-        //当空闲时间耗尽
-        shouldYield = deadline.timeRemaining() < 1;
-    }
-
-    if (!nextFiberReconcileWork && wipRoot) {
-        commitRoot();
-    }
-    requestIdleCallback(workLoop);
-}
-
-requestIdleCallback(workLoop);
-
 
 export function render(element: any, container: HTMLElement): void {
     wipRoot = {
@@ -76,41 +58,72 @@ export function render(element: any, container: HTMLElement): void {
     nextFiberReconcileWork = wipRoot;
 }
 
+
+//工作循环,从空闲循环中取得deadline参数,可以获取允许继续运行的时间
+function workLoop(deadline: IdleDeadline): void {
+    //是否让出
+    let shouldYield = false;
+    //当存在下一个work并且允许继续运行
+    while (nextFiberReconcileWork && !shouldYield) {
+        //执行下一个work,因为前驱指针和兄弟指针的存在,所以可以随时恢复之前的进度,在正常的DFS中走到一个节点是无法一下子找到兄弟节点的
+        nextFiberReconcileWork = performNextWork(nextFiberReconcileWork);
+        //空闲时间耗尽,让出
+        shouldYield = deadline.timeRemaining() < 1;
+    }
+    //fiber节点都处理完了,就提交
+    if (!nextFiberReconcileWork && wipRoot) {
+        commitRoot();
+    }
+    //注册到空闲回调中
+    requestIdleCallback(workLoop);
+}
+
+//注册到空闲回调
+requestIdleCallback(workLoop);
+
+//手动进行的DFS
 function performNextWork(fiber: any): any {
     currentFiber = fiber;  // 设置当前工作的 fiber
-    hookIndex = 0;  // 重置 hook 的索引
-    fiber.hooks = [];  // 初始化 hooks 数组
-    //协调
+
+    // 仅在函数组件时重置 hookIndex 和初始化 hooks 数组
+    if (typeof fiber.type === 'function') {
+        hookIndex = 0;  // 每次执行函数组件时，重置 hookIndex
+        fiber.hooks = [];  // 初始化 hooks 数组
+    }
+
+    // 协调
     reconcile(fiber);
 
-    //返回指向下一个的fiber
+    // 返回指向下一个的 fiber
     if (fiber.child) {
         return fiber.child;
     }
 
-    //如果没有子节点,就找兄弟节点
+    // 如果没有子节点，就找兄弟节点
     let nextFiber = fiber;
     while (nextFiber) {
         if (nextFiber.sibling) {
             return nextFiber.sibling;
         }
-        //没有兄弟节点就回溯到父节点 继续找兄弟节点
+        // 没有兄弟节点就回溯到父节点继续找兄弟节点
         nextFiber = nextFiber.return;
     }
-    //当回溯到根节点的时候,说明已经遍历完成
+    // 当 Fiber 树遍历完成时返回 null
     return null;
 }
+
 
 //协调
 function reconcile(fiber: any): void {
     if (typeof fiber.type === 'function') {
         // 执行这个函数 并将返回的 JSX 结构作为新的子元素
-        console.log("fiber.props:", fiber.props)
         const child = fiber.type(fiber.props);
         if (Array.isArray(child)) {
-            reconcileChildren(fiber, child); // 处理多个子元素
+            // 处理多个子元素
+            reconcileChildren(fiber, child);
         } else {
-            reconcileChildren(fiber, [child]); // 单个子元素，作为数组处理
+            // 单个子元素，作为数组处理
+            reconcileChildren(fiber, [child]);
         }
     } else {
         // 如果 fiber 不是函数式组件，就直接创建 DOM
@@ -132,13 +145,13 @@ function reconcileChildren(wipFiber: any, elements: any[]): void {
 
     // 获取上一次渲染时的 Fiber 树
     let oldFiber = wipFiber.alternate && wipFiber.alternate.child;
-    //对数组打平,为了适配JSX的循环,
+    //对数组打平,为了适配JSX的循环,例如使用List.map方法一次性创建多个元素
     let flattenedElements = elements.flat();
     //进行循环遍历
     while (index < flattenedElements.length || oldFiber != null) {
         //遍历子元素,获取元素
         let element = flattenedElements[index];
-
+        //文本节点进行特殊处理
         if (typeof element !== "object") {
             element = createTextElement(element);
         }
@@ -148,6 +161,7 @@ function reconcileChildren(wipFiber: any, elements: any[]): void {
 
         if (sameType) {
             // 如果类型相同，则复用旧的 Fiber 节点，并更新属性
+            //就假装做了diff吧,两科多叉树的完整比对还是别做了
             newFiber = {
                 type: oldFiber.type,
                 props: element.props,
@@ -213,17 +227,65 @@ function commitWork(fiber: any): void {
     }
 
     const domParent = domParentFiber.dom;
+
     if (fiber.effectTag === "PLACEMENT" && fiber.dom != null) {
-        domParent.appendChild(fiber.dom);
+        // Find the next DOM sibling
+        let nextDomSibling = getNextDomSibling(fiber);
+        if (nextDomSibling && nextDomSibling.parentNode === domParent) {
+            domParent.insertBefore(fiber.dom, nextDomSibling);
+        } else {
+            domParent.appendChild(fiber.dom);
+        }
     } else if (fiber.effectTag === "UPDATE" && fiber.dom != null) {
         updateDom(fiber.dom, fiber.alternate.props, fiber.props);
     } else if (fiber.effectTag === "DELETION") {
-        domParent.removeChild(fiber.dom);
+        commitDeletion(fiber, domParent);
+        return; // Stop further traversal
     }
 
     commitWork(fiber.child);
     commitWork(fiber.sibling);
 }
+function commitDeletion(fiber: any, domParent: any): void {
+    if (fiber.dom) {
+        domParent.removeChild(fiber.dom);
+    } else {
+        commitDeletion(fiber.child, domParent);
+    }
+}
+
+
+function getNextDomSibling(fiber: any): any {
+    let sibling = fiber.sibling;
+    while (sibling) {
+        if (sibling.dom) {
+            return sibling.dom;
+        } else {
+            const childDom = findNextDom(sibling);
+            if (childDom) {
+                return childDom;
+            }
+        }
+        sibling = sibling.sibling;
+    }
+    return null;
+}
+
+function findNextDom(fiber: any): any {
+    let child = fiber.child;
+    while (child) {
+        if (child.dom) {
+            return child.dom;
+        }
+        const childDom = findNextDom(child);
+        if (childDom) {
+            return childDom;
+        }
+        child = child.sibling;
+    }
+    return null;
+}
+
 
 //创建真实DOM
 function createDom(fiber: any): HTMLElement | Text {
@@ -233,7 +295,6 @@ function createDom(fiber: any): HTMLElement | Text {
         dom = document.createTextNode(fiber.props.nodeValue);
     } else {
         dom = document.createElement(fiber.type == undefined ? "div" : fiber.type);
-        console.log(dom)
     }
 
     for (const prop in fiber.props) {
@@ -285,8 +346,7 @@ const setAttribute = (dom: HTMLElement, key: string, value: any): void => {
     }
 };
 function updateDom(dom: HTMLElement | Text, prevProps: any, nextProps: any) {
-    console.log("==")
-    // 1. 处理文本节点
+    // 处理文本节点
     if (dom instanceof Text) {
         if (prevProps.nodeValue !== nextProps.nodeValue) {
             dom.nodeValue = nextProps.nodeValue;
@@ -294,17 +354,23 @@ function updateDom(dom: HTMLElement | Text, prevProps: any, nextProps: any) {
         return;
     }
 
-    // 2. 移除旧的或改变的事件监听器
+    // 移除旧的事件监听器
     Object.keys(prevProps)
         .filter(isEventListenerAttr)
         .forEach(name => {
             const eventType = name.toLowerCase().substring(2);
-            if (!(name in nextProps) || prevProps[name] !== nextProps[name]) {
-                dom.removeEventListener(eventType, prevProps[name]);
-            }
+            dom.removeEventListener(eventType, prevProps[name]);
         });
 
-    // 3. 移除旧的属性
+    // 添加新的事件监听器
+    Object.keys(nextProps)
+        .filter(isEventListenerAttr)
+        .forEach(name => {
+            const eventType = name.toLowerCase().substring(2);
+            dom.addEventListener(eventType, nextProps[name]);
+        });
+
+    // 移除旧的属性
     Object.keys(prevProps)
         .filter(isPlainAttr)
         .forEach(name => {
@@ -313,17 +379,7 @@ function updateDom(dom: HTMLElement | Text, prevProps: any, nextProps: any) {
             }
         });
 
-    // 4. 设置新的或改变的事件监听器
-    Object.keys(nextProps)
-        .filter(isEventListenerAttr)
-        .forEach(name => {
-            const eventType = name.toLowerCase().substring(2);
-            if (!(name in prevProps) || prevProps[name] !== nextProps[name]) {
-                dom.addEventListener(eventType, nextProps[name]);
-            }
-        });
-
-    // 5. 设置新的属性
+    // 设置新的属性
     Object.keys(nextProps)
         .filter(isPlainAttr)
         .forEach(name => {
@@ -332,7 +388,7 @@ function updateDom(dom: HTMLElement | Text, prevProps: any, nextProps: any) {
             }
         });
 
-    // 6. 更新样式属性
+    // 更新样式属性
     if (prevProps.style) {
         Object.keys(prevProps.style).forEach(key => {
             if (!nextProps.style || !(key in nextProps.style)) {
@@ -349,6 +405,7 @@ function updateDom(dom: HTMLElement | Text, prevProps: any, nextProps: any) {
         });
     }
 }
+
 export function useState(initialValue: any) {
     const oldHook =
         currentFiber.alternate && currentFiber.alternate.hooks
@@ -362,8 +419,11 @@ export function useState(initialValue: any) {
 
     // 处理队列中的所有动作
     hook.queue.forEach((action: (arg0: any) => any) => {
+        //TODO:问题所在
+        console.error('action', action);
         hook.state = action(hook.state);
     });
+
 
     const setState = (action: any) => {
         hook.queue.push(typeof action === 'function' ? action : () => action);

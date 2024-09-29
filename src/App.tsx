@@ -5,17 +5,18 @@ function App() {
     const [data, setData] = Dong.useState(114514);
     return (
         <div id="app">
-            <h1 onClick={() => setData(Math.ceil(Math.random() * 10))}>点一下玩一年,不花一分钱</h1>
+            <h1 onClick={() => setData((temp: any) =>temp+1 )}>MiniReact</h1>
             <h2>{data}</h2>
+            <button onClick={() => setElements((temp: any) => [...temp, 114])}>触发useState
+            </button>
             <ul>
-                {elements.map((item, index) => {
+                {elements.map((item: any, index: any) => {
                     return (
-                        <li key={index}
-                            onClick={() => setElements((temp: any) => [...temp, Math.ceil(Math.random() * 10)])}>{item}</li>
+                        <li key={index}>{item}</li>
                     );
                 })}
-
             </ul>
+
 
         </div>
     );
