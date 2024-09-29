@@ -1,5 +1,18 @@
-
 function createElement(type: string, props: any, ...children: any[]): any {
+    if (type == undefined) {
+        console.error("ERROR")
+    }
+    console.log({
+        type,
+        props: {
+            ...props,
+            children: children.map(child =>
+                typeof child === "object"
+                    ? child
+                    : createTextElement(child)
+            ),
+        }
+    })
     return {
         type,
         props: {
@@ -92,8 +105,13 @@ function performNextWork(fiber: any): any {
 function reconcile(fiber: any): void {
     if (typeof fiber.type === 'function') {
         // 执行这个函数 并将返回的 JSX 结构作为新的子元素
+        console.log("fiber.props:", fiber.props)
         const child = fiber.type(fiber.props);
-        reconcileChildren(fiber, [child]); // 处理函数组件返回的子元素
+        if (Array.isArray(child)) {
+            reconcileChildren(fiber, child); // 处理多个子元素
+        } else {
+            reconcileChildren(fiber, [child]); // 单个子元素，作为数组处理
+        }
     } else {
         // 如果 fiber 不是函数式组件，就直接创建 DOM
         //如果fiber节点不存在dom,比如说还没有遍历到这个节点或者第一次渲染
@@ -102,7 +120,8 @@ function reconcile(fiber: any): void {
             fiber.dom = createDom(fiber);
         }
         //协调子元素
-        reconcileChildren(fiber, fiber.props.children);
+        const children = fiber.props?.children || [];
+        reconcileChildren(fiber, children);
     }
 }
 
@@ -113,10 +132,16 @@ function reconcileChildren(wipFiber: any, elements: any[]): void {
 
     // 获取上一次渲染时的 Fiber 树
     let oldFiber = wipFiber.alternate && wipFiber.alternate.child;
+    //对数组打平,为了适配JSX的循环,
+    let flattenedElements = elements.flat();
     //进行循环遍历
-    while (index < elements.length || oldFiber != null) {
+    while (index < flattenedElements.length || oldFiber != null) {
         //遍历子元素,获取元素
-        const element = elements[index];
+        let element = flattenedElements[index];
+
+        if (typeof element !== "object") {
+            element = createTextElement(element);
+        }
         let newFiber = null;
 
         const sameType = oldFiber && element && element.type === oldFiber.type;
@@ -203,10 +228,13 @@ function commitWork(fiber: any): void {
 //创建真实DOM
 function createDom(fiber: any): HTMLElement | Text {
     //判断一下类型,如果文本就创建文本节点
-    const dom =
-        fiber.type == "TEXT_ELEMENT"
-            ? document.createTextNode(fiber.props.nodeValue)
-            : document.createElement(fiber.type);
+    let dom;
+    if (fiber.type == "TEXT_ELEMENT") {
+        dom = document.createTextNode(fiber.props.nodeValue);
+    } else {
+        dom = document.createElement(fiber.type == undefined ? "div" : fiber.type);
+        console.log(dom)
+    }
 
     for (const prop in fiber.props) {
         //进行属性设置

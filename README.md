@@ -21,29 +21,36 @@ npm run dev
 import Dong from './dong';
 
 function App() {
-    const [count, setCount] = Dong.useState(114514);
+    const [elements, setElements] = Dong.useState([1, 2, 3, 4, 5]);
+    const [data, setData] = Dong.useState(114514);
     return (
         <div id="app">
-            <h1>Fuck React</h1>
+            <h1 onClick={() => setData(Math.ceil(Math.random() * 10))}>点一下玩一年,不花一分钱</h1>
+            <h2>{data}</h2>
             <ul>
-                <li onClick={()=>fx(count,setCount)}>{count}</li>
-                <li>Item 2</li>
+                {elements.map((item, index) => {
+                    return (
+                        <li key={index}
+                            onClick={() => setElements((temp: any) => [...temp, Math.ceil(Math.random() * 10)])}>{item}</li>
+                    );
+                })}
+
             </ul>
+
         </div>
     );
 }
 
-function fx(count:any,setCount:any){
-    setCount(Math.ceil(Math.random()*10))
-    console.log(count)
-}
-
+// 渲染组件
 const root = document.getElementById("root");
 if (root) {
-    Dong.render(<App />, root);
+    Dong.render(<App/>, root);
 }
 
 ```
+
+### 存在的问题
+- 调度好像有点毛病,虚拟dom差异更新的时候会乱触发,以后再修复
 
 ### 夹带私货
 - React这个心智负担真的恶心,整的什么函数式+Hooks一般人真玩不来,每次被迫写React都想着Vue的好,都是打工仔写Vue早下班不香吗?
