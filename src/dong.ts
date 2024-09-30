@@ -39,24 +39,27 @@ function createTextElement(text: string): any {
 }
 
 
-let nextFiberReconcileWork: any = null;
-let wipRoot: any = null;
-let currentRoot: any = null; // 跟踪当前根节点
-let deletions: any[] = [];
-
+let nextFiberReconcileWork: any = null; //指向下一个待处理的节点
+let wipRoot: any = null;//表示当前正在构建的Fiber根节点
+let currentRoot: any = null; //保存当前已经提交的 Fiber 树根节点
+let deletions: any[] = [];//保存需要删除的 Fiber 节点
 let currentFiber: any = null; // 当前工作的 fiber
-let hookIndex = 0; // 用于追踪当前 hook 的索引
+let hookIndex = 0; // 用于追踪当前 hooks 的索引
 
+//render函数,进行渲染
 export function render(element: any, container: HTMLElement): void {
     wipRoot = {
-        dom: container,
+        dom: container, //渲染的目标容器
         props: {
-            children: [element],
+            children: [element], //虚拟dom
         },
-        alternate: currentRoot // 将 alternate 设置为 currentRoot
+        alternate: currentRoot //当前根Fiber树存入wipRoot.alternate
     };
-    nextFiberReconcileWork = wipRoot;
+    nextFiberReconcileWork = wipRoot; //wipRoot作为下一次要处理的Fiber
 }
+
+//注册到空闲回调
+requestIdleCallback(workLoop);
 
 
 //工作循环,从空闲循环中取得deadline参数,可以获取允许继续运行的时间
@@ -77,9 +80,6 @@ function workLoop(deadline: IdleDeadline): void {
     //注册到空闲回调中
     requestIdleCallback(workLoop);
 }
-
-//注册到空闲回调
-requestIdleCallback(workLoop);
 
 //手动进行的DFS
 function performNextWork(fiber: any): any {
@@ -122,11 +122,11 @@ function reconcile(fiber: any): void {
             // 处理多个子元素
             reconcileChildren(fiber, child);
         } else {
-            // 单个子元素，作为数组处理
+            // 单个子元素,也包装为数组处理
             reconcileChildren(fiber, [child]);
         }
     } else {
-        // 如果 fiber 不是函数式组件，就直接创建 DOM
+        // 如果 fiber 不是函数式组件就直接创建 DOM
         //如果fiber节点不存在dom,比如说还没有遍历到这个节点或者第一次渲染
         if (!fiber.dom) {
             //给他创建一份
@@ -161,7 +161,7 @@ function reconcileChildren(wipFiber: any, elements: any[]): void {
 
         if (sameType) {
             // 如果类型相同，则复用旧的 Fiber 节点，并更新属性
-            //就假装做了diff吧,两科多叉树的完整比对还是别做了
+            //就假装做了diff吧,两颗多叉树的完整比对还是别做了
             newFiber = {
                 type: oldFiber.type,
                 props: element.props,
@@ -208,14 +208,15 @@ function reconcileChildren(wipFiber: any, elements: any[]): void {
 function commitRoot() {
     // 首先处理需要删除的节点
     deletions.forEach(commitWork);
-    deletions = []; // 清空删除列表
-
+    // 清空删除列表
+    deletions = [];
     commitWork(wipRoot.child);
-    currentRoot = wipRoot; // 在提交后更新 currentRoot
+    // 在提交后更新 currentRoot
+    currentRoot = wipRoot;
     wipRoot = null;
 }
 
-
+//提交工作
 function commitWork(fiber: any): void {
     if (!fiber) {
         return;
@@ -227,64 +228,18 @@ function commitWork(fiber: any): void {
     }
 
     const domParent = domParentFiber.dom;
-
     if (fiber.effectTag === "PLACEMENT" && fiber.dom != null) {
-        // Find the next DOM sibling
-        let nextDomSibling = getNextDomSibling(fiber);
-        if (nextDomSibling && nextDomSibling.parentNode === domParent) {
-            domParent.insertBefore(fiber.dom, nextDomSibling);
-        } else {
-            domParent.appendChild(fiber.dom);
-        }
+        domParent.appendChild(fiber.dom);
     } else if (fiber.effectTag === "UPDATE" && fiber.dom != null) {
         updateDom(fiber.dom, fiber.alternate.props, fiber.props);
     } else if (fiber.effectTag === "DELETION") {
-        commitDeletion(fiber, domParent);
-        return; // Stop further traversal
+        domParent.removeChild(fiber.dom);
     }
 
     commitWork(fiber.child);
     commitWork(fiber.sibling);
 }
-function commitDeletion(fiber: any, domParent: any): void {
-    if (fiber.dom) {
-        domParent.removeChild(fiber.dom);
-    } else {
-        commitDeletion(fiber.child, domParent);
-    }
-}
 
-
-function getNextDomSibling(fiber: any): any {
-    let sibling = fiber.sibling;
-    while (sibling) {
-        if (sibling.dom) {
-            return sibling.dom;
-        } else {
-            const childDom = findNextDom(sibling);
-            if (childDom) {
-                return childDom;
-            }
-        }
-        sibling = sibling.sibling;
-    }
-    return null;
-}
-
-function findNextDom(fiber: any): any {
-    let child = fiber.child;
-    while (child) {
-        if (child.dom) {
-            return child.dom;
-        }
-        const childDom = findNextDom(child);
-        if (childDom) {
-            return childDom;
-        }
-        child = child.sibling;
-    }
-    return null;
-}
 
 
 //创建真实DOM
@@ -417,13 +372,14 @@ export function useState(initialValue: any) {
         queue: oldHook ? oldHook.queue : []
     };
 
-    // 处理队列中的所有动作
+    //处理队列中的所有动作
     hook.queue.forEach((action: (arg0: any) => any) => {
-        //TODO:问题所在
         console.error('action', action);
         hook.state = action(hook.state);
     });
 
+    //清空队列防止重复处理,不加这一句就第n次触发hooks的时候会重复执行n次
+    hook.queue.length = 0;
 
     const setState = (action: any) => {
         hook.queue.push(typeof action === 'function' ? action : () => action);
@@ -440,7 +396,6 @@ export function useState(initialValue: any) {
     hookIndex++;
     return [hook.state, setState];
 }
-
 
 const Dong = {
     createElement,
