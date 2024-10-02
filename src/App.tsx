@@ -5,9 +5,9 @@ function App() {
     const [data, setData] = Dong.useState(114514);
     return (
         <div id="app">
-            <h1 onClick={() => setData((temp: any) =>temp+1 )}>MiniReact,点击触发一次useState</h1>
+            <h1 onClick={() => setData((temp: any) => temp + 1)}>MiniReact,点击触发一次useState</h1>
             <h2>{data}</h2>
-            <button onClick={() => setElements((temp: any) => [...temp, 114])}>点击触发一次useState
+            <button onClick={() => setElements((temp: any) => [...temp, ...temp])}>点击触发一次useState,复制数组  [...temp, ...temp]
             </button>
             <ul>
                 {elements.map((item: any, index: any) => {

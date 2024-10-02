@@ -1,5 +1,6 @@
 //暴露接口给Babel,在vite.config文件里指定这个方法为处理器,避免手动的显示调用
 function createElement(type: string, props: any, ...children: any[]): any {
+    console.log("生成的虚拟DOM如下")
     if (type == undefined) {
         console.error("ERROR")
     }
@@ -55,10 +56,13 @@ export function render(element: any, container: HTMLElement): void {
         },
         alternate: currentRoot //当前根Fiber树存入wipRoot.alternate
     };
-    nextFiberReconcileWork = wipRoot; //wipRoot作为下一次要处理的Fiber
+    nextFiberReconcileWork = wipRoot;//wipRoot作为下一次要处理的Fiber
+    // console.log("render阶段结束,生成的wiproot如下")
+    // console.log(wipRoot)
 }
 
 //注册到空闲回调
+
 requestIdleCallback(workLoop);
 
 
@@ -72,6 +76,10 @@ function workLoop(deadline: IdleDeadline): void {
         nextFiberReconcileWork = performNextWork(nextFiberReconcileWork);
         //空闲时间耗尽,让出
         shouldYield = deadline.timeRemaining() < 1;
+        if (shouldYield) {
+            console.error("空闲时间耗尽，生成虚拟 DOM 被打断，等待下次调度以便从上次中断的地方继续");
+            // alert("空闲时间耗尽，生成虚拟 DOM 被打断，等待下次调度以便从上次中断的地方继续");
+        }
     }
     //fiber节点都处理完了,就提交
     if (!nextFiberReconcileWork && wipRoot) {
@@ -138,6 +146,13 @@ function reconcile(fiber: any): void {
     }
 }
 
+//幽默diff算法,你就说准不准吧? 菜狗前端多多的我们后端才能做全栈多恰米
+function deepEqual(oldfiber: any, newfiber: any) {
+    return JSON.stringify(oldfiber) === JSON.stringify(newfiber);
+}
+
+
+
 //协调子元素
 function reconcileChildren(wipFiber: any, elements: any[]): void {
     let index = 0;
@@ -158,18 +173,33 @@ function reconcileChildren(wipFiber: any, elements: any[]): void {
         let newFiber = null;
 
         const sameType = oldFiber && element && element.type === oldFiber.type;
-
         if (sameType) {
             // 如果类型相同，则复用旧的 Fiber 节点，并更新属性
-            //就假装做了diff吧,两颗多叉树的完整比对还是别做了
-            newFiber = {
-                type: oldFiber.type,
-                props: element.props,
-                dom: oldFiber.dom,
-                return: wipFiber,
-                alternate: oldFiber,
-                effectTag: "UPDATE",
-            };
+            const shouldUpdate = !deepEqual(element.props, oldFiber.props);
+            if (shouldUpdate) {
+                // 类型相同，但 props 不同，需要更新
+                console.log("节点与上一课fiber树不一致,需要进行节点更新,更新的fiber如下")
+                newFiber = {
+                    type: oldFiber.type,
+                    props: element.props,
+                    dom: oldFiber.dom,
+                    return: wipFiber,
+                    alternate: oldFiber,
+                    effectTag: "UPDATE",
+                };
+                console.log(newFiber)
+            } else {
+                // 类型相同，props 相同，不需要更新
+                console.log("不需要更新")
+                newFiber = {
+                    type: oldFiber.type,
+                    props: element.props,
+                    dom: oldFiber.dom,
+                    return: wipFiber,
+                    alternate: oldFiber,
+                    effectTag: "",
+                };
+            }
         } else {
             if (element) {
                 // 如果类型不同，创建新的 Fiber 节点
@@ -230,15 +260,30 @@ function commitWork(fiber: any): void {
     const domParent = domParentFiber.dom;
     if (fiber.effectTag === "PLACEMENT" && fiber.dom != null) {
         domParent.appendChild(fiber.dom);
+        console.log("节点插入");
     } else if (fiber.effectTag === "UPDATE" && fiber.dom != null) {
         updateDom(fiber.dom, fiber.alternate.props, fiber.props);
     } else if (fiber.effectTag === "DELETION") {
-        domParent.removeChild(fiber.dom);
+        commitDeletion(fiber, domParent);
+        console.log("节点删除");
+        return; // 删除时，不需要继续遍历子节点
     }
 
     commitWork(fiber.child);
     commitWork(fiber.sibling);
 }
+
+function commitDeletion(fiber: any, domParent: any): void {
+    if (!fiber) return;
+    if (fiber.dom) {
+        domParent.removeChild(fiber.dom);
+    } else {
+        commitDeletion(fiber.child, domParent);
+    }
+
+    commitDeletion(fiber.sibling, domParent);
+}
+
 
 
 
@@ -256,7 +301,8 @@ function createDom(fiber: any): HTMLElement | Text {
         //进行属性设置
         setAttribute(dom, prop, fiber.props[prop]);
     }
-
+    console.log("真实DOM如下:")
+    console.log(dom)
     return dom;
 }
 //检测是否为监听器?
@@ -374,7 +420,8 @@ export function useState(initialValue: any) {
 
     //处理队列中的所有动作
     hook.queue.forEach((action: (arg0: any) => any) => {
-        console.error('action', action);
+        console.log("处理hooks中")
+        console.log('action', action);
         hook.state = action(hook.state);
     });
 
@@ -382,6 +429,7 @@ export function useState(initialValue: any) {
     hook.queue.length = 0;
 
     const setState = (action: any) => {
+        console.log("setState调用")
         hook.queue.push(typeof action === 'function' ? action : () => action);
         wipRoot = {
             dom: currentRoot.dom,
@@ -389,6 +437,7 @@ export function useState(initialValue: any) {
             alternate: currentRoot
         };
         nextFiberReconcileWork = wipRoot;
+        console.log("useState造成重新渲染")
         requestIdleCallback(workLoop);
     };
 
