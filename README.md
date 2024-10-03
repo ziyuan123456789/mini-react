@@ -5,8 +5,10 @@
 - **虚拟 DOM**：模仿React实现了一版虚拟DOM
 - **Fiber 架构**：实现了 Fiber 算法 能够在浏览器空闲时间分块执行渲染任务 不过调度应该是有点毛病,卡卡的
 - **函数式组件**：支持简单的函数式组件 
-- **useState Hooks 实现**：项目中实现了基础的 `useState`用于管理组件内的状态 并能够触发组件重新渲染
-- **useEffect Hooks 实现**：
+- **useState Hooks 实现**：实现了基础的 `useState`用于管理组件内的状态,当触发set方法则会进行更新
+- **useEffect Hooks 实现**：实现了基础的`useEffect`用于处理副作用,在组件渲染后执行,可依照依赖项进行针对性的更新
+- **useAware Hooks 实现**： Aware,熟不熟悉? 咱们写Java的 到死也记得Spring的拓展接口,带进前端恶心恶心别人也是可以理解的,这个hooks的作用是获取虚拟dom的引用,可以显示在画面上展示
+
 - **简易Diff 算法**：可与进行准确更新真实DOM
 ### 相似项目链接
 [AutumnFramework:简单的SpringBoot仿写](https://github.com/ziyuan123456789/AutumnFramework)
@@ -25,11 +27,26 @@ import Dong from './dong';
 function App() {
     const [elements, setElements] = Dong.useState([1, 2, 3, 4, 5]);
     const [data, setData] = Dong.useState(114514);
+    const vDom = Dong.useAware();
+    Dong.useEffect(() => {
+        alert("这是一个空数组依赖useEffect, 页面加载会运行一次");
+        return () => {
+            console.log("清理副作用");
+        };
+    }, []);
+    Dong.useEffect(() => {
+        alert("这个useEffect依赖于data, 页面加载会运行一次, data变动时也会触发，当前值为 " + data);
+        return () => {
+            console.log("清理副作用");
+        };
+    }, [data]);
+
     return (
         <div id="app">
             <h1 onClick={() => setData((temp: any) => temp + 1)}>MiniReact,点击触发一次useState</h1>
             <h2>{data}</h2>
-            <button onClick={() => setElements((temp: any) => [...temp, ...temp])}>点击触发一次useState,复制数组  [...temp, ...temp]
+            <button onClick={() => setElements((temp: any) => [...temp, ...temp])}>点击触发一次useState,复制数组
+                [...temp, ...temp]
             </button>
             <ul>
                 {elements.map((item: any, index: any) => {
@@ -38,8 +55,15 @@ function App() {
                     );
                 })}
             </ul>
-
-
+            <div>
+                <h2 style={{
+                    fontFamily: 'Arial, sans-serif',
+                    fontWeight: 'bold',
+                    marginBottom: '10px',
+                    color: '#333',
+                }}>虚拟 DOM 展示</h2>
+                <pre>{vDom}</pre>
+            </div>
         </div>
     );
 }
@@ -49,7 +73,6 @@ const root = document.getElementById("root");
 if (root) {
     Dong.render(<App/>, root);
 }
-
 ```
 
 ### 夹带私货
@@ -351,10 +374,29 @@ function commitRoot() {
     // 清空删除列表
     deletions = [];
     commitWork(wipRoot.child);
+    // 执行所有副作用
+    runEffects(wipRoot.child);
     // 在提交后更新 currentRoot
     currentRoot = wipRoot;
     wipRoot = null;
 }
+
+function runEffects(fiber: { hooks: any[]; child: any; sibling: any; }) {
+    if (!fiber) return;
+
+    if (fiber.hooks) {
+        fiber.hooks.forEach((hook) => {
+            if (hook.effect && hook.hasEffect) {
+                hook.cleanup = hook.effect();
+                hook.hasEffect = false;
+            }
+        });
+    }
+
+    runEffects(fiber.child);
+    runEffects(fiber.sibling);
+}
+
 
 //提交工作
 function commitWork(fiber: any): void {
@@ -516,7 +558,7 @@ function updateDom(dom: HTMLElement | Text, prevProps: any, nextProps: any) {
         });
     }
 }
-
+//useState实现
 export function useState(initialValue: any) {
     const oldHook =
         currentFiber.alternate && currentFiber.alternate.hooks
@@ -556,10 +598,80 @@ export function useState(initialValue: any) {
     return [hook.state, setState];
 }
 
+
+// useEffect 实现
+export function useEffect(callback: Function, deps?: any[]) {
+    const oldHook =
+        currentFiber.alternate && currentFiber.alternate.hooks
+            ? currentFiber.alternate.hooks[hookIndex]
+            : null;
+    let hasChangedDeps;
+
+    if (!oldHook) {
+        //首次渲染 直接执行副作用
+        hasChangedDeps = true;
+    } else {
+        if (deps) {
+            //检查依赖项是否发生变化
+            hasChangedDeps = deps.some((dep, i) => {
+                return !Object.is(dep, oldHook.deps[i]);
+            });
+        } else {
+            // 如果没有传递依赖项数组 则每次都重新执行副作用
+            hasChangedDeps = true;
+        }
+    }
+
+    // 保存当前 hook 的状态，包括依赖项、effect 和清理函数
+    const hook = {
+        deps, // 当前的依赖项
+        effect: callback, // 副作用函数
+        cleanup: oldHook ? oldHook.cleanup : null, // 保存旧的清理函数
+    };
+
+    if (hasChangedDeps) {
+        // 如果依赖项发生了变化，或者是首次渲染，执行副作用
+        if (hook.cleanup) {
+            hook.cleanup(); // 先清理之前的副作用
+        }
+        const cleanup = callback(); // 执行当前的副作用
+        hook.cleanup = typeof cleanup === 'function' ? cleanup : null; // 保存清理函数
+    }
+
+    currentFiber.hooks.push(hook); // 将 hook 添加到当前 fiber 的 hooks 列表中
+    hookIndex++; // 更新 hookIndex，指向下一个 hook
+}
+
+// useAware 实现
+export function useAware() {
+    const seen = new Set();
+    function replacer(_key: string, value: any) {
+        if (typeof value === 'object' && value !== null) {
+            if (seen.has(value)) {
+                return;
+            }
+            seen.add(value);
+        }
+
+        return value;
+    }
+
+    if (currentRoot === null || currentRoot === undefined) {
+        return JSON.stringify(nextFiberReconcileWork, replacer, 2);
+    }
+
+    return JSON.stringify(currentRoot, replacer, 2);
+}
+
+
+
+
 const Dong = {
     createElement,
     render,
-    useState
+    useState,
+    useEffect,
+    useAware
 };
 
 export default Dong;

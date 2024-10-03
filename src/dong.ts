@@ -293,10 +293,29 @@ function commitRoot() {
     // 清空删除列表
     deletions = [];
     commitWork(wipRoot.child);
+    // 执行所有副作用
+    runEffects(wipRoot.child);
     // 在提交后更新 currentRoot
     currentRoot = wipRoot;
     wipRoot = null;
 }
+
+function runEffects(fiber: { hooks: any[]; child: any; sibling: any; }) {
+    if (!fiber) return;
+
+    if (fiber.hooks) {
+        fiber.hooks.forEach((hook) => {
+            if (hook.effect && hook.hasEffect) {
+                hook.cleanup = hook.effect();
+                hook.hasEffect = false;
+            }
+        });
+    }
+
+    runEffects(fiber.child);
+    runEffects(fiber.sibling);
+}
+
 
 //提交工作
 function commitWork(fiber: any): void {
@@ -319,13 +338,6 @@ function commitWork(fiber: any): void {
         commitDeletion(fiber, domParent);
         console.log("节点删除");
         return; // 删除时，不需要继续遍历子节点
-    }
-    if (fiber.hooks) {
-        fiber.hooks.forEach((hook: { effect: () => any; cleanup: any; }) => {
-            if (hook.effect) {
-                hook.cleanup = hook.effect();
-            }
-        });
     }
 
     commitWork(fiber.child);
@@ -505,46 +517,80 @@ export function useState(initialValue: any) {
     return [hook.state, setState];
 }
 
-//TODO:USEEFFECT实现
-export function useEffect(callback: Function, deps: any[] | undefined) {
+
+// useEffect 实现
+export function useEffect(callback: Function, deps?: any[]) {
     const oldHook =
         currentFiber.alternate && currentFiber.alternate.hooks
             ? currentFiber.alternate.hooks[hookIndex]
             : null;
+    let hasChangedDeps;
 
-    // 比较依赖项是否发生了变化
-    const hasChangedDeps = oldHook
-        ? !deps || deps.some((dep, i) => !Object.is(dep, oldHook.deps[i]))
-        : true;
+    if (!oldHook) {
+        //首次渲染 直接执行副作用
+        hasChangedDeps = true;
+    } else {
+        if (deps) {
+            //检查依赖项是否发生变化
+            hasChangedDeps = deps.some((dep, i) => {
+                return !Object.is(dep, oldHook.deps[i]);
+            });
+        } else {
+            // 如果没有传递依赖项数组 则每次都重新执行副作用
+            hasChangedDeps = true;
+        }
+    }
 
-    // 保存当前 hook
+    // 保存当前 hook 的状态，包括依赖项、effect 和清理函数
     const hook = {
-        deps, // 记录当前的依赖项
-        effect: callback, // 记录 effect 函数
-        cleanup: oldHook ? oldHook.cleanup : null, // 可能存在的清理函数
+        deps, // 当前的依赖项
+        effect: callback, // 副作用函数
+        cleanup: oldHook ? oldHook.cleanup : null, // 保存旧的清理函数
     };
 
     if (hasChangedDeps) {
-        // 如果依赖项发生了变化，或者是初次渲染，执行 effect
-        // 这里可以在下一次执行时清理上一次的副作用
+        // 如果依赖项发生了变化，或者是首次渲染，执行副作用
         if (hook.cleanup) {
-            hook.cleanup(); // 先清理之前的 effect
+            hook.cleanup(); // 先清理之前的副作用
         }
-
-        const cleanup = callback();
+        const cleanup = callback(); // 执行当前的副作用
         hook.cleanup = typeof cleanup === 'function' ? cleanup : null; // 保存清理函数
     }
 
-    currentFiber.hooks.push(hook);
-    hookIndex++;
+    currentFiber.hooks.push(hook); // 将 hook 添加到当前 fiber 的 hooks 列表中
+    hookIndex++; // 更新 hookIndex，指向下一个 hook
 }
+
+// useAware 实现
+export function useAware() {
+    const seen = new Set();
+    function replacer(_key: string, value: any) {
+        if (typeof value === 'object' && value !== null) {
+            if (seen.has(value)) {
+                return;
+            }
+            seen.add(value);
+        }
+
+        return value;
+    }
+
+    if (currentRoot === null || currentRoot === undefined) {
+        return JSON.stringify(nextFiberReconcileWork, replacer, 2);
+    }
+
+    return JSON.stringify(currentRoot, replacer, 2);
+}
+
+
 
 
 const Dong = {
     createElement,
     render,
     useState,
-    useEffect
+    useEffect,
+    useAware
 };
 
 export default Dong;
