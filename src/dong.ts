@@ -320,6 +320,13 @@ function commitWork(fiber: any): void {
         console.log("节点删除");
         return; // 删除时，不需要继续遍历子节点
     }
+    if (fiber.hooks) {
+        fiber.hooks.forEach((hook: { effect: () => any; cleanup: any; }) => {
+            if (hook.effect) {
+                hook.cleanup = hook.effect();
+            }
+        });
+    }
 
     commitWork(fiber.child);
     commitWork(fiber.sibling);
@@ -458,7 +465,7 @@ function updateDom(dom: HTMLElement | Text, prevProps: any, nextProps: any) {
         });
     }
 }
-
+//useState实现
 export function useState(initialValue: any) {
     const oldHook =
         currentFiber.alternate && currentFiber.alternate.hooks
@@ -498,10 +505,46 @@ export function useState(initialValue: any) {
     return [hook.state, setState];
 }
 
+//TODO:USEEFFECT实现
+export function useEffect(callback: Function, deps: any[] | undefined) {
+    const oldHook =
+        currentFiber.alternate && currentFiber.alternate.hooks
+            ? currentFiber.alternate.hooks[hookIndex]
+            : null;
+
+    // 比较依赖项是否发生了变化
+    const hasChangedDeps = oldHook
+        ? !deps || deps.some((dep, i) => !Object.is(dep, oldHook.deps[i]))
+        : true;
+
+    // 保存当前 hook
+    const hook = {
+        deps, // 记录当前的依赖项
+        effect: callback, // 记录 effect 函数
+        cleanup: oldHook ? oldHook.cleanup : null, // 可能存在的清理函数
+    };
+
+    if (hasChangedDeps) {
+        // 如果依赖项发生了变化，或者是初次渲染，执行 effect
+        // 这里可以在下一次执行时清理上一次的副作用
+        if (hook.cleanup) {
+            hook.cleanup(); // 先清理之前的 effect
+        }
+
+        const cleanup = callback();
+        hook.cleanup = typeof cleanup === 'function' ? cleanup : null; // 保存清理函数
+    }
+
+    currentFiber.hooks.push(hook);
+    hookIndex++;
+}
+
+
 const Dong = {
     createElement,
     render,
-    useState
+    useState,
+    useEffect
 };
 
 export default Dong;

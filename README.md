@@ -5,7 +5,8 @@
 - **虚拟 DOM**：模仿React实现了一版虚拟DOM
 - **Fiber 架构**：实现了 Fiber 算法 能够在浏览器空闲时间分块执行渲染任务 不过调度应该是有点毛病,卡卡的
 - **函数式组件**：支持简单的函数式组件 
-- **Hooks 实现**：项目中实现了基础的 `useState`，用于管理组件内的状态 并能够触发组件重新渲染
+- **useState Hooks 实现**：项目中实现了基础的 `useState`用于管理组件内的状态 并能够触发组件重新渲染
+- **useEffect Hooks 实现**：
 - **简易Diff 算法**：可与进行准确更新真实DOM
 ### 相似项目链接
 [AutumnFramework:简单的SpringBoot仿写](https://github.com/ziyuan123456789/AutumnFramework)

@@ -3,6 +3,13 @@ import Dong from './dong';
 function App() {
     const [elements, setElements] = Dong.useState([1, 2, 3, 4, 5]);
     const [data, setData] = Dong.useState(114514);
+
+    Dong.useEffect(() => {
+        alert("副作用：计数为" + data);
+        return () => {
+            console.log("清理副作用：计数为", data);
+        };
+    }, [data]);
     return (
         <div id="app">
             <h1 onClick={() => setData((temp: any) => temp + 1)}>MiniReact,点击触发一次useState</h1>
