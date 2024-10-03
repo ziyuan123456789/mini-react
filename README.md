@@ -6,7 +6,7 @@
 - **Fiber 架构**：实现了 Fiber 算法 能够在浏览器空闲时间分块执行渲染任务 不过调度应该是有点毛病,卡卡的
 - **函数式组件**：支持简单的函数式组件 
 - **Hooks 实现**：项目中实现了基础的 `useState`，用于管理组件内的状态 并能够触发组件重新渲染
-- **使用序列化实现的diff算法**：可与进行准确更新真实DOM而不是全量覆盖
+- **简易Diff 算法**：可与进行准确更新真实DOM
 ### 相似项目链接
 [AutumnFramework:简单的SpringBoot仿写](https://github.com/ziyuan123456789/AutumnFramework)
 
@@ -57,7 +57,7 @@ if (root) {
 ```js
 //暴露接口给Babel,在vite.config文件里指定这个方法为处理器,避免手动的显示调用
 function createElement(type: string, props: any, ...children: any[]): any {
-    console.log("生成的虚拟DOM如下")
+    console.log("createElement生成的原始虚拟DOM如下")
     if (type == undefined) {
         console.error("ERROR")
     }
@@ -203,9 +203,57 @@ function reconcile(fiber: any): void {
     }
 }
 
-//幽默diff算法,你就说准不准吧? 菜狗前端多多的我们后端才能做全栈多恰米
-function deepEqual(oldfiber: any, newfiber: any) {
-    return JSON.stringify(oldfiber) === JSON.stringify(newfiber);
+//深对比,最小颗粒度进行,避免子元素过多影响父元素
+function shallowEqual(obj1: any, obj2: any): boolean {
+    if (obj1 === obj2) return true;
+
+    const keys1 = Object.keys(obj1);
+    const keys2 = Object.keys(obj2);
+
+    //如果 key 数量不同直接返回 false
+    if (keys1.length !== keys2.length) return false;
+
+    for (let key of keys1) {
+        const value1 = obj1[key];
+        const value2 = obj2[key];
+        if (key === 'children') {
+            // 处理 children 是数组的情况
+            if (Array.isArray(value1) && Array.isArray(value2)) {
+                if (value1.length !== value2.length) return false;
+                if (value1.length > 1) {
+                    for (let i = 0; i < value1.length; i++) {
+                        if (value1[i].type !== value2[i].type) {
+                            return false;
+                        }
+                    }
+                } else if (value1.length === 1) {
+                    if (!Array.isArray(value1[0])) {
+                        return value1[0].props.nodeValue === value2[0].props.nodeValue;
+                    }
+
+                }
+            }
+        } else {
+            //对于监听器进行特殊处理,即使方法体一致但是函数内存地址也不一样,所以用===次次更新
+            if (key.startsWith('on') && typeof value1 === 'function' && typeof value2 === 'function') {
+                continue;
+            }
+            if (value1 !== value2) return false;
+        }
+    }
+
+    return true;
+}
+
+
+//diff算法入口
+function diff(oldfiber: any, newfiber: any): boolean {
+    //俩对象指针一致,无需比较肯定一样
+    if (oldfiber === newfiber) return true;
+    //如果类型不一样,那肯定要更新
+    if (oldfiber.type !== newfiber.type) return false;
+    //进行深比对
+    return shallowEqual(oldfiber.props, newfiber.props);
 }
 
 
@@ -231,11 +279,12 @@ function reconcileChildren(wipFiber: any, elements: any[]): void {
 
         const sameType = oldFiber && element && element.type === oldFiber.type;
         if (sameType) {
-            // 如果类型相同，则复用旧的 Fiber 节点，并更新属性
-            const shouldUpdate = !deepEqual(element.props, oldFiber.props);
+            //进行DIFF算法
+            const shouldUpdate = !diff(element, oldFiber);
             if (shouldUpdate) {
                 // 类型相同，但 props 不同，需要更新
-                console.log("节点与上一课fiber树不一致,需要进行节点更新,更新的fiber如下")
+                console.error("节点与上一课fiber树不一致,需要进行节点更新,更新的fiber如下")
+
                 newFiber = {
                     type: oldFiber.type,
                     props: element.props,
@@ -244,10 +293,12 @@ function reconcileChildren(wipFiber: any, elements: any[]): void {
                     alternate: oldFiber,
                     effectTag: "UPDATE",
                 };
+                alert("节点与上一课fiber树不一致,需要进行节点更新：" + JSON.stringify(newFiber.props));
+
                 console.log(newFiber)
+                console.log(oldFiber)
             } else {
                 // 类型相同，props 相同，不需要更新
-                console.log("不需要更新")
                 newFiber = {
                     type: oldFiber.type,
                     props: element.props,
@@ -286,8 +337,9 @@ function reconcileChildren(wipFiber: any, elements: any[]): void {
         } else if (prevSibling) {
             prevSibling.sibling = newFiber;
         }
-
+        console.log("协调后的虚拟DOM如下")
         prevSibling = newFiber;
+        console.log(prevSibling)
         index++;
     }
 }
