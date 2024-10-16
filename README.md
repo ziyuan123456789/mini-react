@@ -7,7 +7,7 @@
 - **函数式组件**：支持简单的函数式组件 
 - **useState Hooks 实现**：实现了基础的 `useState`用于管理组件内的状态,当触发set方法则会进行更新
 - **useEffect Hooks 实现**：实现了基础的`useEffect`用于处理副作用,在组件渲染后执行,可依照依赖项进行针对性的更新
-- **useAware Hooks 实现**： Aware,熟不熟悉? 咱们写Java的 到死也记得Spring的拓展接口,带进前端恶心恶心别人也是可以理解的,这个hooks的作用是获取虚拟dom的引用,可以显示在画面上展示
+- **useAware Hooks 实现**： Aware 这个hooks的作用是获取虚拟dom的引用,可以显示在画面上展示
 
 - **简易Diff 算法**：可与进行准确更新真实DOM
 ### 相似项目链接
@@ -27,7 +27,9 @@ import Dong from './dong';
 function App() {
     const [elements, setElements] = Dong.useState([1, 2, 3, 4, 5]);
     const [data, setData] = Dong.useState(114514);
-    const vDom = Dong.useAware();
+    const [vDoString] = Dong.useAware();
+    const [backgroundColor, setBackgroundColor] = Dong.useState("");
+
     Dong.useEffect(() => {
         alert("这是一个空数组依赖useEffect, 页面加载会运行一次");
         return () => {
@@ -41,9 +43,27 @@ function App() {
         };
     }, [data]);
 
+    function generateRandomColor() {
+        const letters = '0123456789ABCDEF';
+        let color = '#';
+        for (let i = 0; i < 6; i++) {
+            color += letters[Math.floor(Math.random() * 16)];
+        }
+        return color;
+    }
+
+    const handleClick = () => {
+        setData((temp: number) => temp + 1);
+        setBackgroundColor(generateRandomColor());
+    };
+
+
     return (
         <div id="app">
-            <h1 onClick={() => setData((temp: any) => temp + 1)}>MiniReact,点击触发一次useState</h1>
+            <h1 style={{backgroundColor: backgroundColor, transition: 'background 0.5s'}}
+                onClick={handleClick}>MiniReact - 点击触发一次useState
+            </h1>
+            <h2>打开F12查看MiniReact工作详情</h2>
             <h2>{data}</h2>
             <button onClick={() => setElements((temp: any) => [...temp, ...temp])}>点击触发一次useState,复制数组
                 [...temp, ...temp]
@@ -62,7 +82,7 @@ function App() {
                     marginBottom: '10px',
                     color: '#333',
                 }}>虚拟 DOM 展示</h2>
-                <pre>{vDom}</pre>
+                <pre>{vDoString}</pre>
             </div>
         </div>
     );
@@ -73,6 +93,7 @@ const root = document.getElementById("root");
 if (root) {
     Dong.render(<App/>, root);
 }
+
 ```
 
 ### 夹带私货
@@ -643,24 +664,33 @@ export function useEffect(callback: Function, deps?: any[]) {
 }
 
 // useAware 实现
+// useAware 实现
 export function useAware() {
     const seen = new Set();
-    function replacer(_key: string, value: any) {
+
+    function replacer(key: any, value: any) {
+        if (key === 'dom' || key === 'alternate') {
+            return '[忽略]';
+        }
+        if (key === 'props' && typeof value === 'object' && value !== null) {
+            const filteredProps = {};
+            Object.keys(value).forEach((propKey) => {
+                if (propKey === 'children' || typeof value[propKey] !== 'function') {
+                    // @ts-ignore
+                    filteredProps[propKey] = value[propKey];
+                }
+            });
+            return filteredProps;
+        }
         if (typeof value === 'object' && value !== null) {
             if (seen.has(value)) {
-                return;
+                return '[循环引用]';
             }
             seen.add(value);
         }
-
         return value;
     }
-
-    if (currentRoot === null || currentRoot === undefined) {
-        return JSON.stringify(nextFiberReconcileWork, replacer, 2);
-    }
-
-    return JSON.stringify(currentRoot, replacer, 2);
+    return  [JSON.stringify(wipRoot, replacer, 2), wipRoot];
 }
 
 

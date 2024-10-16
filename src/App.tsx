@@ -3,7 +3,9 @@ import Dong from './dong';
 function App() {
     const [elements, setElements] = Dong.useState([1, 2, 3, 4, 5]);
     const [data, setData] = Dong.useState(114514);
-    const vDom = Dong.useAware();
+    const [vDoString] = Dong.useAware();
+    const [backgroundColor, setBackgroundColor] = Dong.useState("");
+
     Dong.useEffect(() => {
         alert("这是一个空数组依赖useEffect, 页面加载会运行一次");
         return () => {
@@ -17,9 +19,27 @@ function App() {
         };
     }, [data]);
 
+    function generateRandomColor() {
+        const letters = '0123456789ABCDEF';
+        let color = '#';
+        for (let i = 0; i < 6; i++) {
+            color += letters[Math.floor(Math.random() * 16)];
+        }
+        return color;
+    }
+
+    const handleClick = () => {
+        setData((temp: number) => temp + 1);
+        setBackgroundColor(generateRandomColor());
+    };
+
+
     return (
         <div id="app">
-            <h1 onClick={() => setData((temp: any) => temp + 1)}>MiniReact,点击触发一次useState</h1>
+            <h1 style={{backgroundColor: backgroundColor, transition: 'background 0.5s'}}
+                onClick={handleClick}>MiniReact - 点击触发一次useState
+            </h1>
+            <h2>打开F12查看MiniReact工作详情</h2>
             <h2>{data}</h2>
             <button onClick={() => setElements((temp: any) => [...temp, ...temp])}>点击触发一次useState,复制数组
                 [...temp, ...temp]
@@ -38,7 +58,7 @@ function App() {
                     marginBottom: '10px',
                     color: '#333',
                 }}>虚拟 DOM 展示</h2>
-                <pre>{vDom}</pre>
+                <pre>{vDoString}</pre>
             </div>
         </div>
     );

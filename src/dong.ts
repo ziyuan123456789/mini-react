@@ -464,6 +464,7 @@ function updateDom(dom: HTMLElement | Text, prevProps: any, nextProps: any) {
     if (prevProps.style) {
         Object.keys(prevProps.style).forEach(key => {
             if (!nextProps.style || !(key in nextProps.style)) {
+                // @ts-ignore
                 dom.style[key] = "";
             }
         });
@@ -472,6 +473,7 @@ function updateDom(dom: HTMLElement | Text, prevProps: any, nextProps: any) {
     if (nextProps.style) {
         Object.keys(nextProps.style).forEach(key => {
             if (!prevProps.style || prevProps.style[key] !== nextProps.style[key]) {
+                // @ts-ignore
                 dom.style[key] = nextProps.style[key];
             }
         });
@@ -549,11 +551,10 @@ export function useEffect(callback: Function, deps?: any[]) {
     };
 
     if (hasChangedDeps) {
-        // 如果依赖项发生了变化，或者是首次渲染，执行副作用
         if (hook.cleanup) {
-            hook.cleanup(); // 先清理之前的副作用
+            hook.cleanup();
         }
-        const cleanup = callback(); // 执行当前的副作用
+        const cleanup = callback();
         hook.cleanup = typeof cleanup === 'function' ? cleanup : null; // 保存清理函数
     }
 
@@ -564,23 +565,32 @@ export function useEffect(callback: Function, deps?: any[]) {
 // useAware 实现
 export function useAware() {
     const seen = new Set();
-    function replacer(_key: string, value: any) {
+
+    function replacer(key: any, value: any) {
+        if (key === 'dom' || key === 'alternate') {
+            return '[忽略]';
+        }
+        if (key === 'props' && typeof value === 'object' && value !== null) {
+            const filteredProps = {};
+            Object.keys(value).forEach((propKey) => {
+                if (propKey === 'children' || typeof value[propKey] !== 'function') {
+                    // @ts-ignore
+                    filteredProps[propKey] = value[propKey];
+                }
+            });
+            return filteredProps;
+        }
         if (typeof value === 'object' && value !== null) {
             if (seen.has(value)) {
-                return;
+                return '[循环引用]';
             }
             seen.add(value);
         }
-
         return value;
     }
-
-    if (currentRoot === null || currentRoot === undefined) {
-        return JSON.stringify(nextFiberReconcileWork, replacer, 2);
-    }
-
-    return JSON.stringify(currentRoot, replacer, 2);
+    return  [JSON.stringify(wipRoot, replacer, 2), wipRoot];
 }
+
 
 
 
@@ -593,4 +603,7 @@ const Dong = {
     useAware
 };
 
+if (typeof window !== 'undefined') {
+    (window as any).Dong = Dong;
+}
 export default Dong;
