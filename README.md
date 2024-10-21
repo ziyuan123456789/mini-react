@@ -3,14 +3,15 @@
 ### 项目介绍
 - **JSX 渲染**：支持 JSX 语法,将虚拟 DOM 转换为真实 DOM
 - **虚拟 DOM**：模仿React实现了一版虚拟DOM
-- **Fiber 架构**：实现了 Fiber 算法 能够在浏览器空闲时间分块执行渲染任务 不过调度应该是有点毛病,卡卡的
+- **Fiber 架构**：实现了 Fiber 算法 能够在浏览器空闲时间分块执行渲染任务
 - **函数式组件**：支持简单的函数式组件 
 - **useState Hooks 实现**：实现了基础的 `useState`用于管理组件内的状态,当触发set方法则会进行更新
 - **useEffect Hooks 实现**：实现了基础的`useEffect`用于处理副作用,在组件渲染后执行,可依照依赖项进行针对性的更新
 - **useAware Hooks 实现**： Aware 这个hooks的作用是获取虚拟dom的引用,可以显示在画面上展示
-
 - **简易Diff 算法**：可与进行准确更新真实DOM
-### 相似项目链接
+
+
+### 后端项目链接
 [AutumnFramework:简单的SpringBoot仿写](https://github.com/ziyuan123456789/AutumnFramework)
 
 
@@ -20,6 +21,12 @@ npm run dev
 ```
 推荐打开F12观察代码执行流程
 从JSX语法生成虚拟DOM,再到初次真实DOM的生成,再到Fiber算法的调度,再到Hooks的触发,再到DIFF算法的变更查找,再到真实DOM的更新,再到最后的渲染
+
+### 准备实现的内容
+- MiniVue
+- useRef 
+- useCallBack
+
 ### 示例代码
 ```js
 import Dong from './dong';
@@ -27,15 +34,26 @@ import Dong from './dong';
 function App() {
     const [elements, setElements] = Dong.useState([1, 2, 3, 4, 5]);
     const [data, setData] = Dong.useState(114514);
-    const [vDoString] = Dong.useAware();
     const [backgroundColor, setBackgroundColor] = Dong.useState("");
-
+    
     Dong.useEffect(() => {
         alert("这是一个空数组依赖useEffect, 页面加载会运行一次");
         return () => {
             console.log("清理副作用");
         };
     }, []);
+    
+    Dong.useEffect(()=>{
+        const realDomContainer = document.getElementById('realdom');
+        if (realDomContainer) {
+            realDomContainer.innerHTML = `
+        <h2>虚拟 DOM 展示</h2>
+        <div>这段内容已脱离虚拟DOM管理,MiniReact无法感知到这部分的变化</div>
+        <pre>${Dong.useAware()[0]}</pre>
+    `;
+        }
+    },[vDomString])
+    
     Dong.useEffect(() => {
         alert("这个useEffect依赖于data, 页面加载会运行一次, data变动时也会触发，当前值为 " + data);
         return () => {
@@ -75,15 +93,6 @@ function App() {
                     );
                 })}
             </ul>
-            <div>
-                <h2 style={{
-                    fontFamily: 'Arial, sans-serif',
-                    fontWeight: 'bold',
-                    marginBottom: '10px',
-                    color: '#333',
-                }}>虚拟 DOM 展示</h2>
-                <pre>{vDoString}</pre>
-            </div>
         </div>
     );
 }
@@ -91,9 +100,17 @@ function App() {
 // 渲染组件
 const root = document.getElementById("root");
 if (root) {
-    Dong.render(<App/>, root);
+    Dong.render(<App />, root);
 }
 
+const realDomContainer = document.getElementById('realdom');
+if (realDomContainer) {
+    realDomContainer.innerHTML = `
+        <h2>虚拟 DOM 展示</h2>
+        <div>这段内容已脱离虚拟DOM管理,MiniReact无法感知到这部分的变化</div>
+        <pre>${Dong.useAware()[0]}</pre>
+    `;
+}
 ```
 
 ### 夹带私货

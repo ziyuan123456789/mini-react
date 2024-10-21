@@ -7,7 +7,33 @@
     <link rel="icon" type="image/svg+xml" href="minireact.svg" />
 </head>
 <body>
-<div id="root"></div>
+<div class="container">
+    <div id="root"></div>
+    <div id="realdom">
+    </div>
+</div>
 <script type="module" src="./src/App.tsx"></script>
 </body>
+<style>
+
+    .container {
+        display: flex;
+        justify-content: space-between;
+        height: 100vh;
+    }
+
+    #root {
+        width: 50%;
+        padding: 20px;
+        box-sizing: border-box;
+    }
+
+    #realdom {
+        width: 50%;
+        padding: 20px;
+        background-color: #f0f0f0;
+        border-left: 1px solid #ccc;
+        box-sizing: border-box;
+    }
+</style>
 </html>
