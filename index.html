@@ -9,16 +9,17 @@
 <body>
 <div class="container">
     <div id="root"></div>
-    <div id="realdom">
-    </div>
+    <div id="realdom"></div>
 </div>
 <script type="module" src="./src/App.tsx"></script>
 </body>
 <style>
+    body {
+        overflow: hidden;
+    }
 
     .container {
         display: flex;
-        justify-content: space-between;
         height: 100vh;
     }
 
@@ -26,6 +27,14 @@
         width: 50%;
         padding: 20px;
         box-sizing: border-box;
+        overflow-y: scroll;
+        height: 100%;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    #root::-webkit-scrollbar {
+        display: none;
     }
 
     #realdom {
@@ -34,6 +43,14 @@
         background-color: #f0f0f0;
         border-left: 1px solid #ccc;
         box-sizing: border-box;
+        overflow-y: scroll;
+        height: 100%;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+
+    #realdom::-webkit-scrollbar {
+        display: none;
     }
 </style>
 </html>

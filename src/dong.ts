@@ -452,20 +452,20 @@ function updateDom(dom: HTMLElement | Text, prevProps: any, nextProps: any) {
         });
 
     // 设置新的属性
-    Object.keys(nextProps)
-        .filter(isPlainAttr)
-        .forEach(name => {
-            if (prevProps[name] !== nextProps[name]) {
-                dom.setAttribute(name, nextProps[name]);
-            }
-        });
-
-    // 更新样式属性
     if (prevProps.style) {
         Object.keys(prevProps.style).forEach(key => {
             if (!nextProps.style || !(key in nextProps.style)) {
                 // @ts-ignore
                 dom.style[key] = "";
+            }
+        });
+    }
+
+    if (nextProps.style) {
+        Object.keys(nextProps.style).forEach(key => {
+            if (!prevProps.style || prevProps.style[key] !== nextProps.style[key]) {
+                // @ts-ignore
+                dom.style[key] = nextProps.style[key];
             }
         });
     }
