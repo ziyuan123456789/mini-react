@@ -12,6 +12,37 @@ function App() {
         };
     }, []);
 
+    const testFunction = () => {
+        console.log('愚蠢的的MiniReact并不知道函数到底变了没');
+    };
+
+    const testFunctionWithUseCallBack =Dong.useCallBack(()=> {
+        console.log('愚蠢的的MiniReact还是并不知道函数到底变了没,所以他打算引入一些外援');
+    }, []);
+
+    const [functionHandler] = Dong.useState(testFunction);
+    const [functionHandlerWithUseCallBack] = Dong.useState(testFunctionWithUseCallBack);
+
+    Dong.useEffect(() => {
+        if (testFunction===functionHandler) {
+            console.log('第一次运行,所以引用相同');
+        } else {
+            console.log('什么事情都是第一次好,第二次就不是一个感觉了');
+        }
+    });
+
+    Dong.useEffect(() => {
+        if (testFunctionWithUseCallBack===functionHandlerWithUseCallBack) {
+            console.log('useCallBack生效');
+        } else {
+            console.log('useCallBack失效');
+        }
+    });
+
+
+
+
+
     Dong.useEffect(()=>{
         const realDomContainer = document.getElementById('realdom');
         if (realDomContainer) {
@@ -43,11 +74,16 @@ function App() {
         setBackgroundColor(generateRandomColor());
     };
 
+    const handleClick2 = () => {
+        // setData((temp: number) => temp + 1);
+        setBackgroundColor(generateRandomColor());
+    };
+
 
     return (
         <div id="app">
             <h1 style={{backgroundColor: backgroundColor, transition: 'background 0.5s'}}
-                onClick={handleClick}>MiniReact - 点击触发一次useState
+                onClick={data / 2 == 0 ? handleClick : handleClick2}>MiniReact - 点击触发一次useState
             </h1>
             <h2>打开F12查看MiniReact工作详情</h2>
             <h2>{data}</h2>

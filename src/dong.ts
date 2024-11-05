@@ -1,4 +1,5 @@
 //暴露接口给Babel,在vite.config文件里指定这个方法为处理器,避免手动的显示调用
+//在function App() 中 return里的内容每一个节点都会调用一次这个方法
 function createElement(type: string, props: any, ...children: any[]): any {
     console.log("createElement生成的原始虚拟DOM如下")
     if (type == undefined) {
@@ -57,8 +58,8 @@ export function render(element: any, container: HTMLElement): void {
         alternate: currentRoot //当前根Fiber树存入wipRoot.alternate
     };
     nextFiberReconcileWork = wipRoot;//wipRoot作为下一次要处理的Fiber
-    // console.log("render阶段结束,生成的wiproot如下")
-    // console.log(wipRoot)
+    console.log("render阶段结束,生成的wipRoot如下")
+    console.log(wipRoot)
 }
 
 //注册到空闲回调
@@ -77,7 +78,7 @@ function workLoop(deadline: IdleDeadline): void {
         //空闲时间耗尽,让出
         shouldYield = deadline.timeRemaining() < 1;
         if (shouldYield) {
-            console.error("空闲时间耗尽，生成虚拟 DOM 被打断，等待下次调度以便从上次中断的地方继续");
+            console.warn("空闲时间耗尽，生成虚拟 DOM 被打断，等待下次调度以便从上次中断的地方继续");
             // alert("空闲时间耗尽，生成虚拟 DOM 被打断，等待下次调度以便从上次中断的地方继续");
         }
     }
@@ -86,7 +87,10 @@ function workLoop(deadline: IdleDeadline): void {
         commitRoot();
     }
     //注册到空闲回调中
-    requestIdleCallback(workLoop);
+    if (nextFiberReconcileWork) {
+        requestIdleCallback(workLoop);
+    }
+
 }
 
 //手动进行的DFS
@@ -510,7 +514,7 @@ export function useState(initialValue: any) {
             alternate: currentRoot
         };
         nextFiberReconcileWork = wipRoot;
-        console.log("useState造成重新渲染")
+        console.log("调用useState造成重新渲染")
         requestIdleCallback(workLoop);
     };
 
@@ -562,6 +566,36 @@ export function useEffect(callback: Function, deps?: any[]) {
     hookIndex++; // 更新 hookIndex，指向下一个 hook
 }
 
+// useCallback 实现
+export function useCallBack(callback: Function, deps?: any[]) {
+    const oldHook =
+        currentFiber.alternate && currentFiber.alternate.hooks
+            ? currentFiber.alternate.hooks[hookIndex]
+            : null;
+
+    let hasChangedDeps;
+
+    if (!oldHook) {
+        hasChangedDeps = true;
+    } else {
+        if (deps) {
+            hasChangedDeps = deps.some((dep, i) => !Object.is(dep, oldHook.deps[i]));
+        } else {
+            hasChangedDeps = true;
+        }
+    }
+
+    const hook = {
+        callback: hasChangedDeps ? callback : oldHook.callback,
+    };
+
+    currentFiber.hooks.push(hook);
+    hookIndex++;
+
+    return hook.callback;
+}
+
+
 // useAware 实现
 export function useAware() {
     const seen = new Set();
@@ -600,7 +634,8 @@ const Dong = {
     render,
     useState,
     useEffect,
-    useAware
+    useAware,
+    useCallBack
 };
 
 if (typeof window !== 'undefined') {

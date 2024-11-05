@@ -4,11 +4,12 @@
 - **JSX 渲染**：支持 JSX 语法,将虚拟 DOM 转换为真实 DOM
 - **虚拟 DOM**：模仿React实现了一版虚拟DOM
 - **Fiber 架构**：实现了 Fiber 算法 能够在浏览器空闲时间分块执行渲染任务
+- **简易Diff 算法**：可与进行准确更新真实DOM
 - **函数式组件**：支持简单的函数式组件 
 - **useState Hooks 实现**：实现了基础的 `useState`用于管理组件内的状态,当触发set方法则会进行更新
 - **useEffect Hooks 实现**：实现了基础的`useEffect`用于处理副作用,在组件渲染后执行,可依照依赖项进行针对性的更新
 - **useAware Hooks 实现**： Aware 这个hooks的作用是获取虚拟dom的引用,可以显示在画面上展示
-- **简易Diff 算法**：可与进行准确更新真实DOM
+- **useCallBack Hooks 实现**：实现了基础的 `usecallback`用于缓存函数,避免每次的重新创建
 
 
 ### 后端项目链接
@@ -24,8 +25,7 @@ npm run dev
 
 ### 准备实现的内容
 - MiniVue
-- useRef 
-- useCallBack
+- useRef
 
 ### 示例代码
 ```js
@@ -35,14 +35,45 @@ function App() {
     const [elements, setElements] = Dong.useState([1, 2, 3, 4, 5]);
     const [data, setData] = Dong.useState(114514);
     const [backgroundColor, setBackgroundColor] = Dong.useState("");
-    
+    const [vDomString]=Dong.useAware();
     Dong.useEffect(() => {
         alert("这是一个空数组依赖useEffect, 页面加载会运行一次");
         return () => {
             console.log("清理副作用");
         };
     }, []);
-    
+
+    const testFunction = () => {
+        console.log('愚蠢的的MiniReact并不知道函数到底变了没');
+    };
+
+    const testFunctionWithUseCallBack =Dong.useCallBack(()=> {
+        console.log('愚蠢的的MiniReact还是并不知道函数到底变了没,所以他打算引入一些外援');
+    }, []);
+
+    const [functionHandler] = Dong.useState(testFunction);
+    const [functionHandlerWithUseCallBack] = Dong.useState(testFunctionWithUseCallBack);
+
+    Dong.useEffect(() => {
+        if (testFunction===functionHandler) {
+            console.log('第一次运行,所以引用相同');
+        } else {
+            console.log('什么事情都是第一次好,第二次就不是一个感觉了');
+        }
+    });
+
+    Dong.useEffect(() => {
+        if (testFunctionWithUseCallBack===functionHandlerWithUseCallBack) {
+            console.log('useCallBack生效');
+        } else {
+            console.log('useCallBack失效');
+        }
+    });
+
+
+
+
+
     Dong.useEffect(()=>{
         const realDomContainer = document.getElementById('realdom');
         if (realDomContainer) {
@@ -53,7 +84,6 @@ function App() {
     `;
         }
     },[vDomString])
-    
     Dong.useEffect(() => {
         alert("这个useEffect依赖于data, 页面加载会运行一次, data变动时也会触发，当前值为 " + data);
         return () => {
@@ -75,11 +105,16 @@ function App() {
         setBackgroundColor(generateRandomColor());
     };
 
+    const handleClick2 = () => {
+        // setData((temp: number) => temp + 1);
+        setBackgroundColor(generateRandomColor());
+    };
+
 
     return (
         <div id="app">
             <h1 style={{backgroundColor: backgroundColor, transition: 'background 0.5s'}}
-                onClick={handleClick}>MiniReact - 点击触发一次useState
+                onClick={data / 2 == 0 ? handleClick : handleClick2}>MiniReact - 点击触发一次useState
             </h1>
             <h2>打开F12查看MiniReact工作详情</h2>
             <h2>{data}</h2>
@@ -111,6 +146,7 @@ if (realDomContainer) {
         <pre>${Dong.useAware()[0]}</pre>
     `;
 }
+
 ```
 
 ### 夹带私货
