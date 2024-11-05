@@ -5,6 +5,7 @@ function App() {
     const [data, setData] = Dong.useState(114514);
     const [backgroundColor, setBackgroundColor] = Dong.useState("");
     const [vDomString]=Dong.useAware();
+
     Dong.useEffect(() => {
         alert("这是一个空数组依赖useEffect, 页面加载会运行一次");
         return () => {
@@ -21,6 +22,7 @@ function App() {
     }, []);
 
     const [functionHandler] = Dong.useState(testFunction);
+
     const [functionHandlerWithUseCallBack] = Dong.useState(testFunctionWithUseCallBack);
 
     Dong.useEffect(() => {
@@ -33,15 +35,11 @@ function App() {
 
     Dong.useEffect(() => {
         if (testFunctionWithUseCallBack===functionHandlerWithUseCallBack) {
-            console.log('useCallBack生效');
+            console.log('useCallBack生效中');
         } else {
-            console.log('useCallBack失效');
+            console.log('useCallBack失效了');
         }
     });
-
-
-
-
 
     Dong.useEffect(()=>{
         const realDomContainer = document.getElementById('realdom');
@@ -53,6 +51,7 @@ function App() {
     `;
         }
     },[vDomString])
+
     Dong.useEffect(() => {
         alert("这个useEffect依赖于data, 页面加载会运行一次, data变动时也会触发，当前值为 " + data);
         return () => {
@@ -69,16 +68,36 @@ function App() {
         return color;
     }
 
-    const handleClick = () => {
+    const dispatcher = Dong.useCallBack(() => {
+        console.log(data)
+        if (data % 2 === 0) {
+            handleClick();
+        } else {
+            handleClick2();
+        }
+
+    }, []);
+
+
+    const handleClick = Dong.useCallBack(() => {
         setData((temp: number) => temp + 1);
         setBackgroundColor(generateRandomColor());
-    };
+    }, []);
+
+    const handleClick2 = Dong.useCallBack(() => {
+        alert("成功挂载新的事件");
+        setData((temp: number) => temp + 1);
+    }, []);
+
 
 
     return (
         <div id="app">
-            <h1 style={{backgroundColor: backgroundColor, transition: 'background 0.5s'}}
-                onClick={handleClick}>MiniReact - 点击触发一次useState
+            <h1
+                style={{backgroundColor: backgroundColor, transition: 'background 0.5s'}}
+                onClick={dispatcher}
+            >
+                MiniReact - 点击触发一次 useState
             </h1>
             <h2>打开F12查看MiniReact工作详情</h2>
             <h2>{data}</h2>
@@ -99,7 +118,7 @@ function App() {
 // 渲染组件
 const root = document.getElementById("root");
 if (root) {
-    Dong.render(<App />, root);
+    Dong.render(<App/>, root);
 }
 
 const realDomContainer = document.getElementById('realdom');

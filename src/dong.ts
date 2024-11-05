@@ -174,6 +174,10 @@ function shallowEqual(obj1: any, obj2: any): boolean {
                         }
                     }
                 } else if (value1.length === 1) {
+                    if (Array.isArray(value1[0])) {
+                        console.error(value1[0])
+                    }
+
                     if (!Array.isArray(value1[0])) {
                         return value1[0].props.nodeValue === value2[0].props.nodeValue;
                     }
@@ -181,16 +185,41 @@ function shallowEqual(obj1: any, obj2: any): boolean {
                 }
             }
         } else {
-            //对于监听器进行特殊处理,即使方法体一致但是函数内存地址也不一样,所以用===次次更新
+            //对于监听器进行特殊处理,即使方法体一致但是函数内存地址也不一样,所以用===就造成次次更新
             if (key.startsWith('on') && typeof value1 === 'function' && typeof value2 === 'function') {
-                continue;
+                return value1 === value2;
             }
-            if (value1 !== value2) return false;
+            if (!deepEqual(value1, value2)) {
+                return false;
+            }
         }
     }
 
     return true;
 }
+
+const deepEqual = (obj1: any, obj2: any) => {
+    if (obj1 === obj2) return true;
+
+    if (typeof obj1 !== 'object' || typeof obj2 !== 'object' || obj1 == null || obj2 == null) {
+        return false;
+    }
+
+    const keys1 = Object.keys(obj1);
+    const keys2 = Object.keys(obj2);
+
+    if (keys1.length !== keys2.length) return false;
+
+    for (let key of keys1) {
+        if (!keys2.includes(key) || !deepEqual(obj1[key], obj2[key])) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
 
 
 //diff算法入口
@@ -422,7 +451,6 @@ const setAttribute = (dom: HTMLElement, key: string, value: any): void => {
     }
 };
 function updateDom(dom: HTMLElement | Text, prevProps: any, nextProps: any) {
-    // 处理文本节点
     if (dom instanceof Text) {
         if (prevProps.nodeValue !== nextProps.nodeValue) {
             dom.nodeValue = nextProps.nodeValue;
@@ -430,59 +458,55 @@ function updateDom(dom: HTMLElement | Text, prevProps: any, nextProps: any) {
         return;
     }
 
-    // 移除旧的事件监听器
-    Object.keys(prevProps)
-        .filter(isEventListenerAttr)
-        .forEach(name => {
+    Object.entries(prevProps)
+        .filter(([key, value]) => isEventListenerAttr(key, value))
+        .forEach(([name, value]) => {
             const eventType = name.toLowerCase().substring(2);
-            dom.removeEventListener(eventType, prevProps[name]);
+            dom.removeEventListener(eventType, value as EventListener);
         });
 
-    // 添加新的事件监听器
-    Object.keys(nextProps)
-        .filter(isEventListenerAttr)
-        .forEach(name => {
+
+    Object.entries(nextProps)
+        .filter(([key, value]) => isEventListenerAttr(key, value))
+        .forEach(([name, value]) => {
             const eventType = name.toLowerCase().substring(2);
-            dom.addEventListener(eventType, nextProps[name]);
+            dom.addEventListener(eventType, value as EventListener);
         });
 
     // 移除旧的属性
     Object.keys(prevProps)
-        .filter(isPlainAttr)
-        .forEach(name => {
+        .filter((key) => isPlainAttr(key, prevProps[key]))
+        .forEach((name) => {
             if (!(name in nextProps)) {
                 dom.removeAttribute(name);
             }
         });
 
-    // 设置新的属性
+    Object.keys(nextProps)
+        .filter((key) => isPlainAttr(key, nextProps[key]))
+        .forEach((name) => {
+            if (prevProps[name] !== nextProps[name]) {
+                dom.setAttribute(name, nextProps[name]);
+            }
+        });
+
     if (prevProps.style) {
-        Object.keys(prevProps.style).forEach(key => {
+        Object.keys(prevProps.style).forEach((key) => {
             if (!nextProps.style || !(key in nextProps.style)) {
-                // @ts-ignore
-                dom.style[key] = "";
+                (dom as HTMLElement).style[key as any] = "";
             }
         });
     }
 
     if (nextProps.style) {
-        Object.keys(nextProps.style).forEach(key => {
+        Object.keys(nextProps.style).forEach((key) => {
             if (!prevProps.style || prevProps.style[key] !== nextProps.style[key]) {
-                // @ts-ignore
-                dom.style[key] = nextProps.style[key];
-            }
-        });
-    }
-
-    if (nextProps.style) {
-        Object.keys(nextProps.style).forEach(key => {
-            if (!prevProps.style || prevProps.style[key] !== nextProps.style[key]) {
-                // @ts-ignore
-                dom.style[key] = nextProps.style[key];
+                (dom as HTMLElement).style[key as any] = nextProps.style[key];
             }
         });
     }
 }
+
 //useState实现
 export function useState(initialValue: any) {
     const oldHook =
@@ -587,6 +611,7 @@ export function useCallBack(callback: Function, deps?: any[]) {
 
     const hook = {
         callback: hasChangedDeps ? callback : oldHook.callback,
+        deps: deps,
     };
 
     currentFiber.hooks.push(hook);
