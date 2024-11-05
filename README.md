@@ -105,16 +105,11 @@ function App() {
         setBackgroundColor(generateRandomColor());
     };
 
-    const handleClick2 = () => {
-        // setData((temp: number) => temp + 1);
-        setBackgroundColor(generateRandomColor());
-    };
-
 
     return (
         <div id="app">
             <h1 style={{backgroundColor: backgroundColor, transition: 'background 0.5s'}}
-                onClick={data / 2 == 0 ? handleClick : handleClick2}>MiniReact - 点击触发一次useState
+                onClick={handleClick}>MiniReact - 点击触发一次useState
             </h1>
             <h2>打开F12查看MiniReact工作详情</h2>
             <h2>{data}</h2>
