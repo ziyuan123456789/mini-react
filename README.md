@@ -90,14 +90,15 @@ function App() {
         };
     }, [data]);
 
-    function generateRandomColor() {
+    const generateRandomColor = Dong.useCallBack(() => {
         const letters = '0123456789ABCDEF';
         let color = '#';
         for (let i = 0; i < 6; i++) {
             color += letters[Math.floor(Math.random() * 16)];
         }
         return color;
-    }
+    }, []);
+
 
     const dispatcher = Dong.useCallBack(() => {
         if (data % 2 === 0) {
@@ -106,19 +107,17 @@ function App() {
             handleClick2();
         }
 
-    }, []);
+    }, [data]);
 
 
     const handleClick = Dong.useCallBack(() => {
         setData((temp: number) => temp + 1);
         setBackgroundColor(generateRandomColor());
-    }, []);
+    }, [generateRandomColor]);
 
     const handleClick2 = Dong.useCallBack(() => {
-        alert("成功挂载新的事件");
         setData((temp: number) => temp + 1);
     }, []);
-
 
 
     return (
@@ -131,7 +130,8 @@ function App() {
             </h1>
             <h2>打开F12查看MiniReact工作详情</h2>
             <h2>{data}</h2>
-            <button onClick={() => setElements((temp: any) => [...temp, ...temp])}>点击触发一次useState,复制数组
+            <button
+                onClick={Dong.useCallBack(() => setElements((temp: any) => [...temp, ...temp]), [])}>点击触发一次useState,复制数组
                 [...temp, ...temp]
             </button>
             <ul>
@@ -159,7 +159,6 @@ if (realDomContainer) {
         <pre>${Dong.useAware()[0]}</pre>
     `;
 }
-
 ```
 
 ### 夹带私货
@@ -167,6 +166,7 @@ if (realDomContainer) {
 ### 源码:
 ```js
 //暴露接口给Babel,在vite.config文件里指定这个方法为处理器,避免手动的显示调用
+//在function App() 中 return里的内容每一个节点都会调用一次这个方法
 function createElement(type: string, props: any, ...children: any[]): any {
     console.log("createElement生成的原始虚拟DOM如下")
     if (type == undefined) {
@@ -225,8 +225,8 @@ export function render(element: any, container: HTMLElement): void {
         alternate: currentRoot //当前根Fiber树存入wipRoot.alternate
     };
     nextFiberReconcileWork = wipRoot;//wipRoot作为下一次要处理的Fiber
-    // console.log("render阶段结束,生成的wiproot如下")
-    // console.log(wipRoot)
+    console.log("render阶段结束,生成的wipRoot如下")
+    console.log(wipRoot)
 }
 
 //注册到空闲回调
@@ -245,7 +245,7 @@ function workLoop(deadline: IdleDeadline): void {
         //空闲时间耗尽,让出
         shouldYield = deadline.timeRemaining() < 1;
         if (shouldYield) {
-            console.error("空闲时间耗尽，生成虚拟 DOM 被打断，等待下次调度以便从上次中断的地方继续");
+            console.warn("空闲时间耗尽，生成虚拟 DOM 被打断，等待下次调度以便从上次中断的地方继续");
             // alert("空闲时间耗尽，生成虚拟 DOM 被打断，等待下次调度以便从上次中断的地方继续");
         }
     }
@@ -254,7 +254,10 @@ function workLoop(deadline: IdleDeadline): void {
         commitRoot();
     }
     //注册到空闲回调中
-    requestIdleCallback(workLoop);
+    if (nextFiberReconcileWork) {
+        requestIdleCallback(workLoop);
+    }
+
 }
 
 //手动进行的DFS
@@ -338,6 +341,10 @@ function shallowEqual(obj1: any, obj2: any): boolean {
                         }
                     }
                 } else if (value1.length === 1) {
+                    if (Array.isArray(value1[0])) {
+                        console.error(value1[0])
+                    }
+
                     if (!Array.isArray(value1[0])) {
                         return value1[0].props.nodeValue === value2[0].props.nodeValue;
                     }
@@ -345,16 +352,41 @@ function shallowEqual(obj1: any, obj2: any): boolean {
                 }
             }
         } else {
-            //对于监听器进行特殊处理,即使方法体一致但是函数内存地址也不一样,所以用===次次更新
+            //对于监听器进行特殊处理,即使方法体一致但是函数内存地址也不一样,所以用===就造成次次更新
             if (key.startsWith('on') && typeof value1 === 'function' && typeof value2 === 'function') {
-                continue;
+                return value1 === value2;
             }
-            if (value1 !== value2) return false;
+            if (!deepEqual(value1, value2)) {
+                return false;
+            }
         }
     }
 
     return true;
 }
+
+const deepEqual = (obj1: any, obj2: any) => {
+    if (obj1 === obj2) return true;
+
+    if (typeof obj1 !== 'object' || typeof obj2 !== 'object' || obj1 == null || obj2 == null) {
+        return false;
+    }
+
+    const keys1 = Object.keys(obj1);
+    const keys2 = Object.keys(obj2);
+
+    if (keys1.length !== keys2.length) return false;
+
+    for (let key of keys1) {
+        if (!keys2.includes(key) || !deepEqual(obj1[key], obj2[key])) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+
 
 
 //diff算法入口
@@ -586,7 +618,6 @@ const setAttribute = (dom: HTMLElement, key: string, value: any): void => {
     }
 };
 function updateDom(dom: HTMLElement | Text, prevProps: any, nextProps: any) {
-    // 处理文本节点
     if (dom instanceof Text) {
         if (prevProps.nodeValue !== nextProps.nodeValue) {
             dom.nodeValue = nextProps.nodeValue;
@@ -594,57 +625,55 @@ function updateDom(dom: HTMLElement | Text, prevProps: any, nextProps: any) {
         return;
     }
 
-    // 移除旧的事件监听器
-    Object.keys(prevProps)
-        .filter(isEventListenerAttr)
-        .forEach(name => {
+    Object.entries(prevProps)
+        .filter(([key, value]) => isEventListenerAttr(key, value))
+        .forEach(([name, value]) => {
             const eventType = name.toLowerCase().substring(2);
-            dom.removeEventListener(eventType, prevProps[name]);
+            dom.removeEventListener(eventType, value as EventListener);
         });
 
-    // 添加新的事件监听器
-    Object.keys(nextProps)
-        .filter(isEventListenerAttr)
-        .forEach(name => {
+
+    Object.entries(nextProps)
+        .filter(([key, value]) => isEventListenerAttr(key, value))
+        .forEach(([name, value]) => {
             const eventType = name.toLowerCase().substring(2);
-            dom.addEventListener(eventType, nextProps[name]);
+            dom.addEventListener(eventType, value as EventListener);
         });
 
     // 移除旧的属性
     Object.keys(prevProps)
-        .filter(isPlainAttr)
-        .forEach(name => {
+        .filter((key) => isPlainAttr(key, prevProps[key]))
+        .forEach((name) => {
             if (!(name in nextProps)) {
                 dom.removeAttribute(name);
             }
         });
 
-    // 设置新的属性
     Object.keys(nextProps)
-        .filter(isPlainAttr)
-        .forEach(name => {
+        .filter((key) => isPlainAttr(key, nextProps[key]))
+        .forEach((name) => {
             if (prevProps[name] !== nextProps[name]) {
                 dom.setAttribute(name, nextProps[name]);
             }
         });
 
-    // 更新样式属性
     if (prevProps.style) {
-        Object.keys(prevProps.style).forEach(key => {
+        Object.keys(prevProps.style).forEach((key) => {
             if (!nextProps.style || !(key in nextProps.style)) {
-                dom.style[key] = "";
+                (dom as HTMLElement).style[key as any] = "";
             }
         });
     }
 
     if (nextProps.style) {
-        Object.keys(nextProps.style).forEach(key => {
+        Object.keys(nextProps.style).forEach((key) => {
             if (!prevProps.style || prevProps.style[key] !== nextProps.style[key]) {
-                dom.style[key] = nextProps.style[key];
+                (dom as HTMLElement).style[key as any] = nextProps.style[key];
             }
         });
     }
 }
+
 //useState实现
 export function useState(initialValue: any) {
     const oldHook =
@@ -676,7 +705,7 @@ export function useState(initialValue: any) {
             alternate: currentRoot
         };
         nextFiberReconcileWork = wipRoot;
-        console.log("useState造成重新渲染")
+        console.log("调用useState造成重新渲染")
         requestIdleCallback(workLoop);
     };
 
@@ -717,11 +746,10 @@ export function useEffect(callback: Function, deps?: any[]) {
     };
 
     if (hasChangedDeps) {
-        // 如果依赖项发生了变化，或者是首次渲染，执行副作用
         if (hook.cleanup) {
-            hook.cleanup(); // 先清理之前的副作用
+            hook.cleanup();
         }
-        const cleanup = callback(); // 执行当前的副作用
+        const cleanup = callback();
         hook.cleanup = typeof cleanup === 'function' ? cleanup : null; // 保存清理函数
     }
 
@@ -729,7 +757,37 @@ export function useEffect(callback: Function, deps?: any[]) {
     hookIndex++; // 更新 hookIndex，指向下一个 hook
 }
 
-// useAware 实现
+// useCallback 实现
+export function useCallBack(callback: Function, deps?: any[]) {
+    const oldHook =
+        currentFiber.alternate && currentFiber.alternate.hooks
+            ? currentFiber.alternate.hooks[hookIndex]
+            : null;
+
+    let hasChangedDeps;
+
+    if (!oldHook) {
+        hasChangedDeps = true;
+    } else {
+        if (deps) {
+            hasChangedDeps = deps.some((dep, i) => !Object.is(dep, oldHook.deps[i]));
+        } else {
+            hasChangedDeps = true;
+        }
+    }
+
+    const hook = {
+        callback: hasChangedDeps ? callback : oldHook.callback,
+        deps: deps,
+    };
+
+    currentFiber.hooks.push(hook);
+    hookIndex++;
+
+    return hook.callback;
+}
+
+
 // useAware 实现
 export function useAware() {
     const seen = new Set();
@@ -762,13 +820,19 @@ export function useAware() {
 
 
 
+
 const Dong = {
     createElement,
     render,
     useState,
     useEffect,
-    useAware
+    useAware,
+    useCallBack
 };
 
+if (typeof window !== 'undefined') {
+    (window as any).Dong = Dong;
+}
 export default Dong;
+
 ```

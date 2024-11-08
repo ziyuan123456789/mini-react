@@ -59,36 +59,34 @@ function App() {
         };
     }, [data]);
 
-    function generateRandomColor() {
+    const generateRandomColor = Dong.useCallBack(() => {
         const letters = '0123456789ABCDEF';
         let color = '#';
         for (let i = 0; i < 6; i++) {
             color += letters[Math.floor(Math.random() * 16)];
         }
         return color;
-    }
+    }, []);
+
 
     const dispatcher = Dong.useCallBack(() => {
-        console.log(data)
         if (data % 2 === 0) {
             handleClick();
         } else {
             handleClick2();
         }
 
-    }, []);
+    }, [data]);
 
 
     const handleClick = Dong.useCallBack(() => {
         setData((temp: number) => temp + 1);
         setBackgroundColor(generateRandomColor());
-    }, []);
+    }, [generateRandomColor]);
 
     const handleClick2 = Dong.useCallBack(() => {
-        alert("成功挂载新的事件");
         setData((temp: number) => temp + 1);
     }, []);
-
 
 
     return (
@@ -101,7 +99,8 @@ function App() {
             </h1>
             <h2>打开F12查看MiniReact工作详情</h2>
             <h2>{data}</h2>
-            <button onClick={() => setElements((temp: any) => [...temp, ...temp])}>点击触发一次useState,复制数组
+            <button
+                onClick={Dong.useCallBack(() => setElements((temp: any) => [...temp, ...temp]), [])}>点击触发一次useState,复制数组
                 [...temp, ...temp]
             </button>
             <ul>
