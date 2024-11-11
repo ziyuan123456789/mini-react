@@ -79,7 +79,6 @@ function workLoop(deadline: IdleDeadline): void {
         shouldYield = deadline.timeRemaining() < 1;
         if (shouldYield) {
             console.warn("空闲时间耗尽，生成虚拟 DOM 被打断，等待下次调度以便从上次中断的地方继续");
-            // alert("空闲时间耗尽，生成虚拟 DOM 被打断，等待下次调度以便从上次中断的地方继续");
         }
     }
     //fiber节点都处理完了,就提交
@@ -259,7 +258,7 @@ function reconcileChildren(wipFiber: any, elements: any[]): void {
             const shouldUpdate = !diff(element, oldFiber);
             if (shouldUpdate) {
                 // 类型相同，但 props 不同，需要更新
-                console.error("节点与上一课fiber树不一致,需要进行节点更新,更新的fiber如下")
+                console.warn("节点与上一课fiber树不一致,需要进行节点更新,更新的fiber如下")
 
                 newFiber = {
                     type: oldFiber.type,

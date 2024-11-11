@@ -7,7 +7,14 @@ function App() {
     const [vDomString]=Dong.useAware();
 
     Dong.useEffect(() => {
-        alert("这是一个空数组依赖useEffect, 页面加载会运行一次");
+        const realDomContainer = document.getElementById('realdom');
+        if (realDomContainer) {
+            realDomContainer.innerHTML = `
+        <h1>虚拟 DOM 展示</h1>
+        <h5>来自useEffect的消息:这是一个空数组依赖useEffect, 页面加载会运行一次</h5>
+        <div>这段内容已脱离虚拟DOM管理,MiniReact无法感知到这部分的变化</div>
+        <pre>${Dong.useAware()[0]}</pre>`;
+        }
         return () => {
             console.log("清理副作用");
         };
@@ -53,7 +60,14 @@ function App() {
     },[vDomString])
 
     Dong.useEffect(() => {
-        alert("这个useEffect依赖于data, 页面加载会运行一次, data变动时也会触发，当前值为 " + data);
+        const realDomContainer = document.getElementById('realdom');
+        if (realDomContainer) {
+            realDomContainer.innerHTML = `
+        <h1>虚拟 DOM 展示</h1>
+        <h5>来自useEffect的消息:这个useEffect依赖于data, 页面加载会运行一次, data变动时也会触发，当前值为 ${data}</h5>
+        <div>这段内容已脱离虚拟DOM管理,MiniReact无法感知到这部分的变化</div>
+        <pre>${Dong.useAware()[0]}</pre>`;
+        }
         return () => {
             console.log("清理副作用");
         };
