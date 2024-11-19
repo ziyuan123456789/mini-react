@@ -16,6 +16,7 @@ export default defineConfig({
       output: {
         exports: 'named',               // 解决 named 和 default exports 一起使用的警告
         entryFileNames: '[name].umd.js', // 强制生成 .js 文件扩展名
+        name: 'Dong',                    // 确保 UMD 格式能够正确挂载到 window 上
       },
     },
   },

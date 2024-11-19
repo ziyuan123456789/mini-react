@@ -111,7 +111,7 @@ function App() {
             >
                 MiniReact - 点击触发一次 useState
             </h1>
-            <h2>打开F12查看MiniReact工作详情</h2>
+            <h2>打开F12查看MiniReact工作详情 当差异出现会绘制一个淡蓝色的边框包裹住更新的元素</h2>
             <h2>{data}</h2>
             <button
                 onClick={Dong.useCallBack(() => setElements((temp: any) => [...temp, ...temp]), [])}>点击触发一次useState,复制数组

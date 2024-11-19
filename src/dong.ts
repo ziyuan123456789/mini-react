@@ -267,8 +267,9 @@ function reconcileChildren(wipFiber: any, elements: any[]): void {
                     return: wipFiber,
                     alternate: oldFiber,
                     effectTag: "UPDATE",
+                    shouldHighlight: true,
                 };
-                alert("节点与上一课fiber树不一致,需要进行节点更新：" + JSON.stringify(newFiber.props));
+                // alert("节点与上一课fiber树不一致,需要进行节点更新：" + JSON.stringify(newFiber.props));
 
                 console.log(newFiber)
                 console.log(oldFiber)
@@ -281,6 +282,7 @@ function reconcileChildren(wipFiber: any, elements: any[]): void {
                     return: wipFiber,
                     alternate: oldFiber,
                     effectTag: "",
+                    shouldHighlight: false,
                 };
             }
         } else {
@@ -293,6 +295,7 @@ function reconcileChildren(wipFiber: any, elements: any[]): void {
                     return: wipFiber,
                     alternate: null,
                     effectTag: "PLACEMENT",
+                    shouldHighlight: true,
                 };
             }
 
@@ -363,6 +366,10 @@ function commitWork(fiber: any): void {
     const domParent = domParentFiber.dom;
     if (fiber.effectTag === "PLACEMENT" && fiber.dom != null) {
         domParent.appendChild(fiber.dom);
+        domParent.classList.add("fade-in-border");
+        setTimeout(() => {
+            domParent.classList.remove("fade-in-border");
+        }, 3000);
         console.log("节点插入");
     } else if (fiber.effectTag === "UPDATE" && fiber.dom != null) {
         updateDom(fiber.dom, fiber.alternate.props, fiber.props);
@@ -504,7 +511,16 @@ function updateDom(dom: HTMLElement | Text, prevProps: any, nextProps: any) {
             }
         });
     }
+
+    (dom as HTMLElement).classList.add("fade-in-border");
+
+    // 移除动画类以便下次变化可以重新添加动画
+    setTimeout(() => {
+        (dom as HTMLElement).classList.remove("fade-in-border");
+    }, 3000);
+
 }
+
 
 //useState实现
 export function useState(initialValue: any) {

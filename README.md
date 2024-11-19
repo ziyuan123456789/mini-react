@@ -10,6 +10,7 @@
 - **useEffect Hooks 实现**：实现了基础的`useEffect`用于处理副作用,在组件渲染后执行,可依照依赖项进行针对性的更新
 - **useAware Hooks 实现**： Aware 这个hooks的作用是获取虚拟dom的引用,可以显示在画面上展示
 - **useCallBack Hooks 实现**：实现了基础的 `usecallback`用于缓存函数,避免每次的重新创建
+- **简易的DIFF算法查看器**：当差异出现会像React Dev Tools 一样绘制一个淡蓝色的边框提示你哪里发生了变更
 
 
 ### 后端项目链接
@@ -142,7 +143,7 @@ function App() {
             >
                 MiniReact - 点击触发一次 useState
             </h1>
-            <h2>打开F12查看MiniReact工作详情</h2>
+            <h2>打开F12查看MiniReact工作详情 当差异出现会绘制一个淡蓝色的边框包裹住更新的元素</h2>
             <h2>{data}</h2>
             <button
                 onClick={Dong.useCallBack(() => setElements((temp: any) => [...temp, ...temp]), [])}>点击触发一次useState,复制数组

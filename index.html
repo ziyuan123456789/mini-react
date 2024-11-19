@@ -52,5 +52,21 @@
     #realdom::-webkit-scrollbar {
         display: none;
     }
+    @keyframes fadeInBorder {
+        0% {
+            border: 2px solid transparent;
+        }
+        50% {
+            border: 2px solid lightblue;
+        }
+        100% {
+            border: 2px solid transparent;
+        }
+    }
+
+    .fade-in-border {
+        animation: fadeInBorder 3s ease-in-out;
+    }
+
 </style>
 </html>
