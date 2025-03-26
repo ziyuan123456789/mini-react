@@ -12,6 +12,7 @@
     <div id="realdom"></div>
 </div>
 <script type="module" src="./src/App.tsx"></script>
+<script src="echarts.min.js"></script>
 </body>
 <style>
     body {
@@ -52,21 +53,23 @@
     #realdom::-webkit-scrollbar {
         display: none;
     }
-    @keyframes fadeInBorder {
+
+    @keyframes fadeInOutline {
         0% {
-            border: 2px solid transparent;
+            outline: 2px solid transparent;
         }
         50% {
-            border: 2px solid lightblue;
+            outline: 2px solid lightblue;
         }
         100% {
-            border: 2px solid transparent;
+            outline: 2px solid transparent;
         }
     }
 
     .fade-in-border {
-        animation: fadeInBorder 3s ease-in-out;
+        animation: fadeInOutline 3s ease-in-out;
     }
+
 
 </style>
 </html>

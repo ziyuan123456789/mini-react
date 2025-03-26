@@ -450,6 +450,10 @@ const setAttribute = (dom: HTMLElement, key: string, value: any): void => {
         // 如果是样式对象，将样式对象的属性应用到 DOM 元素的 style 上
         Object.assign(dom.style, value);
     }
+    //useref
+    else if (key === 'ref' && typeof value === 'object') {
+        value.current = dom;
+    }
     // 5. 检查属性是否是普通属性
     else if (isPlainAttr(key, value)) {
         // 如果是普通属性，使用 setAttribute 将属性和值设置到 DOM 元素上
@@ -513,8 +517,6 @@ function updateDom(dom: HTMLElement | Text, prevProps: any, nextProps: any) {
     }
 
     (dom as HTMLElement).classList.add("fade-in-border");
-
-    // 移除动画类以便下次变化可以重新添加动画
     setTimeout(() => {
         (dom as HTMLElement).classList.remove("fade-in-border");
     }, 3000);
@@ -666,6 +668,23 @@ export function useAware() {
 }
 
 
+export function useRef(initialValue: any) {
+    const oldHook =
+        currentFiber.alternate && currentFiber.alternate.hooks
+            ? currentFiber.alternate.hooks[hookIndex]
+            : null;
+
+
+    const hook = oldHook || {current: initialValue};
+
+    currentFiber.hooks.push(hook);
+    hookIndex++;
+
+    return hook;
+}
+
+
+
 
 
 
@@ -675,7 +694,8 @@ const Dong = {
     useState,
     useEffect,
     useAware,
-    useCallBack
+    useCallBack,
+    useRef
 };
 
 if (typeof window !== 'undefined') {

@@ -1,10 +1,23 @@
 import Dong from './dong';
 
+declare const echarts: any;
+
 function App() {
     const [elements, setElements] = Dong.useState([1, 2, 3, 4, 5]);
     const [data, setData] = Dong.useState(114514);
     const [backgroundColor, setBackgroundColor] = Dong.useState("");
+    const [xData, setXData] = Dong.useState([]);
+    const [yData, setYData] = Dong.useState([]);
     const [vDomString]=Dong.useAware();
+
+    const inputRef = Dong.useRef(null);
+
+    const chartRef = Dong.useRef(null);
+
+
+    const handleRef = Dong.useCallBack(() => {
+        alert(inputRef.current?.value);
+    }, []);
 
     Dong.useEffect(() => {
         const realDomContainer = document.getElementById('realdom');
@@ -83,40 +96,64 @@ function App() {
     }, []);
 
 
-    const dispatcher = Dong.useCallBack(() => {
-        if (data % 2 === 0) {
-            handleClick();
-        } else {
-            handleClick2();
-        }
-
-    }, [data]);
-
 
     const handleClick = Dong.useCallBack(() => {
         setData((temp: number) => temp + 1);
         setBackgroundColor(generateRandomColor());
     }, [generateRandomColor]);
 
-    const handleClick2 = Dong.useCallBack(() => {
-        setData((temp: number) => temp + 1);
-    }, []);
+
+    Dong.useEffect(() => {
+        setTimeout(() => {
+            const chartDom = chartRef.current;
+            if (!chartDom) return;
+
+            const myChart = echarts.init(chartDom);
+
+            setXData(() => [...xData, 1]);
+            setYData(() => [...xData, 1]);
+            const option = {
+                xAxis: {
+                    type: 'category',
+                    data: xData,
+                },
+                yAxis: {
+                    type: 'value',
+                },
+                series: [
+                    {
+                        data: yData,
+                        type: 'bar',
+                    },
+                ],
+            };
+
+            myChart.setOption(option);
+
+            return () => {
+                myChart.dispose();
+            };
+        }, 0);
+    }, [data]);
+
 
 
     return (
         <div id="app">
             <h1
-                style={{backgroundColor: backgroundColor, transition: 'background 0.5s'}}
-                onClick={dispatcher}
+                style={{backgroundColor: backgroundColor, transition: 'background 0.5s'}} onClick={handleClick}
             >
                 MiniReact - 点击触发一次 useState
             </h1>
             <h2>打开F12查看MiniReact工作详情 当差异出现会绘制一个淡蓝色的边框包裹住更新的元素</h2>
             <h2>{data}</h2>
+            <input ref={inputRef}/>
+            <button onClick={handleRef}>点击获取输入框内容</button>
             <button
                 onClick={Dong.useCallBack(() => setElements((temp: any) => [...temp, ...temp]), [])}>点击触发一次useState,复制数组
                 [...temp, ...temp]
             </button>
+            <div ref={chartRef} style={{width: "600px", height: "400px"}}></div>
             <ul>
                 {elements.map((item: any, index: any) => {
                     return (
@@ -124,6 +161,8 @@ function App() {
                     );
                 })}
             </ul>
+
+
         </div>
     );
 }
