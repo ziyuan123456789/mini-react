@@ -11,7 +11,6 @@
     <div id="root"></div>
     <div id="realdom"></div>
 </div>
-<script type="module" src="./src/App.tsx"></script>
 <script src="echarts.min.js"></script>
 </body>
 <style>
@@ -72,4 +71,10 @@
 
 
 </style>
+<script type="module">
+    window.addEventListener('DOMContentLoaded', async () => {
+        const { default: App } = await import('./src/App.tsx');
+        App();
+    });
+</script>
 </html>
