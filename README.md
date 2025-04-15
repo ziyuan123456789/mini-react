@@ -1,16 +1,16 @@
 ## MiniReact
 非常简单的React仿写
 ### 项目介绍
-- **JSX 渲染**：支持 JSX 语法,将虚拟 DOM 转换为真实 DOM
-- **虚拟 DOM**：模仿React实现了一版虚拟DOM
-- **Fiber 架构**：实现了 Fiber 算法 能够在浏览器空闲时间分块执行渲染任务
-- **简易Diff 算法**：可与进行准确更新真实DOM
+- **JSX 渲染**：支持 JSX 语法,使用Babel进行编译
+- **虚拟 DOM**：仿照 React 实现了一版简化的虚拟 DOM
+- **Fiber 架构**：实现了基于 Fiber 的调度算法，能够在浏览器空闲时间分块执行渲染任务，避免长任务阻塞主线程
+- **简易Diff 算法**：实现了基础的 Diff 算法,能有效计算虚拟 DOM 差异并准确更新发生变化的部分
 - **函数式组件**：支持简单的函数式组件 
-- **useState Hooks 实现**：实现了基础的 `useState`用于管理组件内的状态,当触发set方法则会进行更新
-- **useEffect Hooks 实现**：实现了基础的`useEffect`用于处理副作用,在组件渲染后执行,可依照依赖项进行针对性的更新
-- **useAware Hooks 实现**： Aware 这个hooks的作用是获取虚拟dom的引用,可以显示在画面上展示
-- **useRefHooks 实现**：实现了基础的 `useRef`用于获取真实dom引用
-- **useCallBack Hooks 实现**：实现了基础的 `usecallback`用于缓存函数,避免每次的重新创建
+- **useState Hooks 实现**：实现了基础的 `useState`用于管理组件内的状态,当触发set方法会触发重新渲染
+- **useEffect Hooks 实现**：实现了基础的`useEffect`用于处理副作用,在组件渲染后执行,可依照依赖项变动情况判断是否执行
+- **useAware Hooks 实现**： 这个Hooks的作用是获取虚拟Dom的引用
+- **useRefHooks 实现**：实现了基础的 `useRef`用于获取真实Dom引用
+- **useCallBack Hooks 实现**：实现了基础的 `usecallback`用于缓存函数本身,避免每次的重新创建,也避免因为函数自身地址变动造成不必要的重新渲染
 - **简易的DIFF算法查看器**：当差异出现会像React Dev Tools 一样绘制一个淡蓝色的边框提示你哪里发生了变更
 
 
