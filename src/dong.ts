@@ -81,15 +81,13 @@ function workLoop(deadline: IdleDeadline): void {
             console.warn("空闲时间耗尽，生成虚拟 DOM 被打断，等待下次调度以便从上次中断的地方继续");
         }
     }
+    if (nextFiberReconcileWork) {
+        requestIdleCallback(workLoop);
+    }
     //fiber节点都处理完了,就提交
     if (!nextFiberReconcileWork && wipRoot) {
         commitRoot();
     }
-    //注册到空闲回调中
-    if (nextFiberReconcileWork) {
-        requestIdleCallback(workLoop);
-    }
-
 }
 
 //手动进行的DFS
@@ -267,7 +265,6 @@ function reconcileChildren(wipFiber: any, elements: any[]): void {
                     return: wipFiber,
                     alternate: oldFiber,
                     effectTag: "UPDATE",
-                    shouldHighlight: true,
                 };
                 // alert("节点与上一课fiber树不一致,需要进行节点更新：" + JSON.stringify(newFiber.props));
 
@@ -282,7 +279,6 @@ function reconcileChildren(wipFiber: any, elements: any[]): void {
                     return: wipFiber,
                     alternate: oldFiber,
                     effectTag: "",
-                    shouldHighlight: false,
                 };
             }
         } else {
@@ -295,7 +291,6 @@ function reconcileChildren(wipFiber: any, elements: any[]): void {
                     return: wipFiber,
                     alternate: null,
                     effectTag: "PLACEMENT",
-                    shouldHighlight: true,
                 };
             }
 
@@ -556,7 +551,14 @@ export function useState(initialValue: any) {
         };
         nextFiberReconcileWork = wipRoot;
         console.log("调用useState造成重新渲染")
-        requestIdleCallback(workLoop);
+        while (nextFiberReconcileWork ) {
+            //执行下一个work,因为前驱指针和兄弟指针的存在,所以可以随时恢复之前的进度,在正常的DFS中走到一个节点是无法一下子找到兄弟节点的
+            nextFiberReconcileWork = performNextWork(nextFiberReconcileWork);
+        }
+        //fiber节点都处理完了,就提交
+        if (!nextFiberReconcileWork && wipRoot) {
+            commitRoot();
+        }
     };
 
     currentFiber.hooks.push(hook);
@@ -607,6 +609,43 @@ export function useEffect(callback: Function, deps?: any[]) {
     hookIndex++; // 更新 hookIndex，指向下一个 hook
 }
 
+// useMemo 实现
+export function useMemo(callback: Function, deps?: any[]) {
+    const oldHook =
+        currentFiber.alternate && currentFiber.alternate.hooks
+            ? currentFiber.alternate.hooks[hookIndex]
+            : null;
+
+    let hasChangedDeps = false;
+    let memoizedValue;
+
+    if (!oldHook) {
+        hasChangedDeps = true;
+    } else {
+        if (deps) {
+            hasChangedDeps = deps.some((dep, i) => !Object.is(dep, oldHook.deps[i]));
+        } else {
+            hasChangedDeps = true;
+        }
+    }
+
+    if (hasChangedDeps) {
+        memoizedValue = callback();
+    } else {
+        memoizedValue = oldHook.memoizedValue;
+    }
+
+    const hook = {
+        memoizedValue: memoizedValue,
+        deps: deps,
+    };
+
+    currentFiber.hooks.push(hook);
+    hookIndex++;
+    return memoizedValue;
+}
+
+
 // useCallback 实现
 export function useCallBack(callback: Function, deps?: any[]) {
     const oldHook =
@@ -638,7 +677,7 @@ export function useCallBack(callback: Function, deps?: any[]) {
 }
 
 
-// useAware 实现
+// useAware 实现,他不是一个hook
 export function useAware() {
     const seen = new Set();
 
@@ -695,7 +734,8 @@ const Dong = {
     useEffect,
     useAware,
     useCallBack,
-    useRef
+    useRef,
+    useMemo
 };
 
 if (typeof window !== 'undefined') {
