@@ -6,11 +6,12 @@
 - **Fiber 架构**：实现了基于 Fiber 的调度算法，能够在浏览器空闲时间分块执行渲染任务，避免长任务阻塞主线程
 - **简易Diff 算法**：实现了基础的 Diff 算法,能有效计算虚拟 DOM 差异并准确更新发生变化的部分
 - **函数式组件**：支持简单的函数式组件 
-- **useState Hooks 实现**：实现了基础的 `useState`用于管理组件内的状态,当触发set方法会触发重新渲染
-- **useEffect Hooks 实现**：实现了基础的`useEffect`用于处理副作用,在组件渲染后执行,可依照依赖项变动情况判断是否执行
+- **useState Hooks 实现**：用于管理组件内的状态,当触发set方法会触发重新渲染
+- **useEffect Hooks 实现**：用于处理副作用,在组件渲染后执行,可依照依赖项变动情况判断是否执行
 - **useAware Hooks 实现**： 这个Hooks的作用是获取虚拟Dom的引用
-- **useRefHooks 实现**：实现了基础的 `useRef`用于获取真实Dom引用
 - **useCallBack Hooks 实现**：实现了基础的 `usecallback`用于缓存函数本身,避免每次的重新创建,也避免因为函数自身地址变动造成不必要的重新渲染
+- **useRef Hooks 实现**：用于获取一个 DOM 元素的引用
+- **useMemo Hooks 实现**：用于用于缓存值的计算结果
 - **简易的DIFF算法查看器**：当差异出现会像React Dev Tools 一样绘制一个淡蓝色的边框提示你哪里发生了变更
 
 
@@ -30,7 +31,6 @@ npm run dev
 
 ### 准备实现的内容
 - MiniVue
-- useRef
 
 ### 示例代码
 ```js
@@ -263,18 +263,15 @@ function workLoop(deadline: IdleDeadline): void {
         shouldYield = deadline.timeRemaining() < 1;
         if (shouldYield) {
             console.warn("空闲时间耗尽，生成虚拟 DOM 被打断，等待下次调度以便从上次中断的地方继续");
-            // alert("空闲时间耗尽，生成虚拟 DOM 被打断，等待下次调度以便从上次中断的地方继续");
         }
+    }
+    if (nextFiberReconcileWork) {
+        requestIdleCallback(workLoop);
     }
     //fiber节点都处理完了,就提交
     if (!nextFiberReconcileWork && wipRoot) {
         commitRoot();
     }
-    //注册到空闲回调中
-    if (nextFiberReconcileWork) {
-        requestIdleCallback(workLoop);
-    }
-
 }
 
 //手动进行的DFS
@@ -443,7 +440,7 @@ function reconcileChildren(wipFiber: any, elements: any[]): void {
             const shouldUpdate = !diff(element, oldFiber);
             if (shouldUpdate) {
                 // 类型相同，但 props 不同，需要更新
-                console.error("节点与上一课fiber树不一致,需要进行节点更新,更新的fiber如下")
+                console.warn("节点与上一课fiber树不一致,需要进行节点更新,更新的fiber如下")
 
                 newFiber = {
                     type: oldFiber.type,
@@ -453,7 +450,7 @@ function reconcileChildren(wipFiber: any, elements: any[]): void {
                     alternate: oldFiber,
                     effectTag: "UPDATE",
                 };
-                alert("节点与上一课fiber树不一致,需要进行节点更新：" + JSON.stringify(newFiber.props));
+                // alert("节点与上一课fiber树不一致,需要进行节点更新：" + JSON.stringify(newFiber.props));
 
                 console.log(newFiber)
                 console.log(oldFiber)
@@ -548,6 +545,10 @@ function commitWork(fiber: any): void {
     const domParent = domParentFiber.dom;
     if (fiber.effectTag === "PLACEMENT" && fiber.dom != null) {
         domParent.appendChild(fiber.dom);
+        domParent.classList.add("fade-in-border");
+        setTimeout(() => {
+            domParent.classList.remove("fade-in-border");
+        }, 3000);
         console.log("节点插入");
     } else if (fiber.effectTag === "UPDATE" && fiber.dom != null) {
         updateDom(fiber.dom, fiber.alternate.props, fiber.props);
@@ -628,6 +629,10 @@ const setAttribute = (dom: HTMLElement, key: string, value: any): void => {
         // 如果是样式对象，将样式对象的属性应用到 DOM 元素的 style 上
         Object.assign(dom.style, value);
     }
+    //useref
+    else if (key === 'ref' && typeof value === 'object') {
+        value.current = dom;
+    }
     // 5. 检查属性是否是普通属性
     else if (isPlainAttr(key, value)) {
         // 如果是普通属性，使用 setAttribute 将属性和值设置到 DOM 元素上
@@ -689,7 +694,14 @@ function updateDom(dom: HTMLElement | Text, prevProps: any, nextProps: any) {
             }
         });
     }
+
+    (dom as HTMLElement).classList.add("fade-in-border");
+    setTimeout(() => {
+        (dom as HTMLElement).classList.remove("fade-in-border");
+    }, 3000);
+
 }
+
 
 //useState实现
 export function useState(initialValue: any) {
@@ -723,7 +735,14 @@ export function useState(initialValue: any) {
         };
         nextFiberReconcileWork = wipRoot;
         console.log("调用useState造成重新渲染")
-        requestIdleCallback(workLoop);
+        while (nextFiberReconcileWork ) {
+            //执行下一个work,因为前驱指针和兄弟指针的存在,所以可以随时恢复之前的进度,在正常的DFS中走到一个节点是无法一下子找到兄弟节点的
+            nextFiberReconcileWork = performNextWork(nextFiberReconcileWork);
+        }
+        //fiber节点都处理完了,就提交
+        if (!nextFiberReconcileWork && wipRoot) {
+            commitRoot();
+        }
     };
 
     currentFiber.hooks.push(hook);
@@ -774,6 +793,43 @@ export function useEffect(callback: Function, deps?: any[]) {
     hookIndex++; // 更新 hookIndex，指向下一个 hook
 }
 
+// useMemo 实现
+export function useMemo(callback: Function, deps?: any[]) {
+    const oldHook =
+        currentFiber.alternate && currentFiber.alternate.hooks
+            ? currentFiber.alternate.hooks[hookIndex]
+            : null;
+
+    let hasChangedDeps = false;
+    let memoizedValue;
+
+    if (!oldHook) {
+        hasChangedDeps = true;
+    } else {
+        if (deps) {
+            hasChangedDeps = deps.some((dep, i) => !Object.is(dep, oldHook.deps[i]));
+        } else {
+            hasChangedDeps = true;
+        }
+    }
+
+    if (hasChangedDeps) {
+        memoizedValue = callback();
+    } else {
+        memoizedValue = oldHook.memoizedValue;
+    }
+
+    const hook = {
+        memoizedValue: memoizedValue,
+        deps: deps,
+    };
+
+    currentFiber.hooks.push(hook);
+    hookIndex++;
+    return memoizedValue;
+}
+
+
 // useCallback 实现
 export function useCallBack(callback: Function, deps?: any[]) {
     const oldHook =
@@ -805,7 +861,7 @@ export function useCallBack(callback: Function, deps?: any[]) {
 }
 
 
-// useAware 实现
+// useAware 实现,他不是一个hook
 export function useAware() {
     const seen = new Set();
 
@@ -835,6 +891,23 @@ export function useAware() {
 }
 
 
+export function useRef(initialValue: any) {
+    const oldHook =
+        currentFiber.alternate && currentFiber.alternate.hooks
+            ? currentFiber.alternate.hooks[hookIndex]
+            : null;
+
+
+    const hook = oldHook || {current: initialValue};
+
+    currentFiber.hooks.push(hook);
+    hookIndex++;
+
+    return hook;
+}
+
+
+
 
 
 
@@ -844,7 +917,9 @@ const Dong = {
     useState,
     useEffect,
     useAware,
-    useCallBack
+    useCallBack,
+    useRef,
+    useMemo
 };
 
 if (typeof window !== 'undefined') {

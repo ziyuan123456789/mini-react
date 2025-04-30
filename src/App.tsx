@@ -2,17 +2,150 @@ import Dong from './dong';
 
 declare const echarts: any;
 
+function Square({value, onSquareClick}) {
+    return (
+        <div
+            style={{
+                width: '50px',
+                height: '50px',
+                backgroundColor: '#f4f4f4',
+                border: '1px solid #ccc',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                fontSize: '24px',
+                cursor: 'pointer',
+                transition: 'background-color 0.3s ease',
+            }}
+            onClick={onSquareClick}
+        >
+            {value}
+        </div>
+    );
+}
+
+
+const Board = ({xIsNext, squares, onPlay}) => {
+    function handleClick(i) {
+        if (calculateWinner(squares) || squares[i]) {
+            return;
+        }
+        const nextSquares = squares.slice();
+        if (xIsNext) {
+            nextSquares[i] = 'X';
+        } else {
+            nextSquares[i] = 'O';
+        }
+        onPlay(nextSquares);
+    }
+
+    const winner = calculateWinner(squares);
+    let status;
+    if (winner) {
+        status = 'Winner: ' + winner;
+    } else {
+        status = 'Next player: ' + (xIsNext ? 'X' : 'O');
+    }
+
+    return (
+        <div style={{display: 'flex', flexDirection: 'column', marginBottom: '20px'}}>
+            <div style={{fontSize: '20px', marginBottom: '20px'}}>{status}</div>
+            <div style={{display: 'flex', justifyContent: 'center', marginBottom: '5px'}}>
+                <Square value={squares[0]} onSquareClick={() => handleClick(0)}/>
+                <Square value={squares[1]} onSquareClick={() => handleClick(1)}/>
+                <Square value={squares[2]} onSquareClick={() => handleClick(2)}/>
+            </div>
+            <div style={{display: 'flex', justifyContent: 'center', marginBottom: '5px'}}>
+                <Square value={squares[3]} onSquareClick={() => handleClick(3)}/>
+                <Square value={squares[4]} onSquareClick={() => handleClick(4)}/>
+                <Square value={squares[5]} onSquareClick={() => handleClick(5)}/>
+            </div>
+            <div style={{display: 'flex', justifyContent: 'center'}}>
+                <Square value={squares[6]} onSquareClick={() => handleClick(6)}/>
+                <Square value={squares[7]} onSquareClick={() => handleClick(7)}/>
+                <Square value={squares[8]} onSquareClick={() => handleClick(8)}/>
+            </div>
+        </div>
+    );
+}
+
+function calculateWinner(squares) {
+    const lines = [
+        [0, 1, 2],
+        [3, 4, 5],
+        [6, 7, 8],
+        [0, 3, 6],
+        [1, 4, 7],
+        [2, 5, 8],
+        [0, 4, 8],
+        [2, 4, 6],
+    ];
+    for (let i = 0; i < lines.length; i++) {
+        const [a, b, c] = lines[i];
+        if (squares[a] && squares[a] === squares[b] && squares[a] === squares[c]) {
+            return squares[a];
+        }
+    }
+    return null;
+}
+
+const Parent = () => {
+    const [num, setNum] = Dong.useState(0);
+
+    const computeResult = Dong.useMemo(() => {
+        console.error("useMemo计算");
+        return <h4>{num}</h4>
+    }, [num])
+
+
+    return (
+        <div>
+            {computeResult}
+            <h5
+                onClick={() => {
+                    setNum(num + 1)
+                }}
+            >
+                useMemo测试
+            </h5>
+        </div>
+    );
+};
+
+
+
 function App() {
-    const [elements, setElements] = Dong.useState([1, 2, 3, 4, 5]);
+    const divRef = Dong.useRef(null);
+    const [position, setPosition] = Dong.useState({
+        x: 0,
+        y: 0
+    });
+    const [history, setHistory] = Dong.useState([Array(9).fill(null)]);
+    const [currentMove, setCurrentMove] = Dong.useState(0);
+    const xIsNext = currentMove % 2 === 0;
+    const currentSquares = history[currentMove];
     const [data, setData] = Dong.useState(114514);
     const [backgroundColor, setBackgroundColor] = Dong.useState("");
     const [xData, setXData] = Dong.useState([]);
     const [yData, setYData] = Dong.useState([]);
-    const [vDomString]=Dong.useAware();
+    const [vDomString] = Dong.useAware();
 
     const inputRef = Dong.useRef(null);
 
     const chartRef = Dong.useRef(null);
+
+    const handlePointerMove = Dong.useCallBack((e) => {
+        const divRect = divRef.current.getBoundingClientRect();
+        const x = e.clientX - divRect.left;
+        const y = e.clientY - divRect.top;
+        setPosition({x, y});
+    }, []);
+
+    const handlePlay = Dong.useCallBack((nextSquares) => {
+        const nextHistory = [...history.slice(0, currentMove + 1), nextSquares];
+        setHistory(nextHistory);
+        setCurrentMove(nextHistory.length - 1);
+    }, [history, currentMove]);
 
 
     const handleRef = Dong.useCallBack(() => {
@@ -37,7 +170,7 @@ function App() {
         console.log('愚蠢的的MiniReact并不知道函数到底变了没');
     };
 
-    const testFunctionWithUseCallBack =Dong.useCallBack(()=> {
+    const testFunctionWithUseCallBack = Dong.useCallBack(() => {
         console.log('愚蠢的的MiniReact还是并不知道函数到底变了没,所以他打算引入一些外援');
     }, []);
 
@@ -46,7 +179,7 @@ function App() {
     const [functionHandlerWithUseCallBack] = Dong.useState(testFunctionWithUseCallBack);
 
     Dong.useEffect(() => {
-        if (testFunction===functionHandler) {
+        if (testFunction === functionHandler) {
             console.log('第一次运行,所以引用相同');
         } else {
             console.log('什么事情都是第一次好,第二次就不是一个感觉了');
@@ -54,14 +187,14 @@ function App() {
     });
 
     Dong.useEffect(() => {
-        if (testFunctionWithUseCallBack===functionHandlerWithUseCallBack) {
+        if (testFunctionWithUseCallBack === functionHandlerWithUseCallBack) {
             console.log('useCallBack生效中');
         } else {
             console.log('useCallBack失效了');
         }
     });
 
-    Dong.useEffect(()=>{
+    Dong.useEffect(() => {
         const realDomContainer = document.getElementById('realdom');
         if (realDomContainer) {
             realDomContainer.innerHTML = `
@@ -70,7 +203,7 @@ function App() {
         <pre>${Dong.useAware()[0]}</pre>
     `;
         }
-    },[vDomString])
+    }, [vDomString])
 
     Dong.useEffect(() => {
         const realDomContainer = document.getElementById('realdom');
@@ -94,7 +227,6 @@ function App() {
         }
         return color;
     }, []);
-
 
 
     const handleClick = Dong.useCallBack(() => {
@@ -137,32 +269,70 @@ function App() {
     }, [data]);
 
 
-
     return (
-        <div id="app">
-            <h1
-                style={{backgroundColor: backgroundColor, transition: 'background 0.5s'}} onClick={handleClick}
-            >
-                MiniReact - 点击触发一次 useState
+        <div id="app" style={{fontFamily: 'sans-serif', padding: '2rem', maxWidth: '960px', margin: '0 auto'}}>
+            <h1 style={{backgroundColor, transition: 'background 0.5s', padding: '1rem', borderRadius: '8px'}}
+                onClick={handleClick}>
+                🎯 MiniReact - 点击触发一次 useState
             </h1>
-            <h2>打开F12查看MiniReact工作详情 当差异出现会绘制一个淡蓝色的边框包裹住更新的元素</h2>
-            <h2>{data}</h2>
-            <input ref={inputRef}/>
-            <button onClick={handleRef}>点击获取输入框内容</button>
-            <button
-                onClick={Dong.useCallBack(() => setElements((temp: any) => [...temp, ...temp]), [])}>点击触发一次useState,复制数组
-                [...temp, ...temp]
-            </button>
-            <div ref={chartRef} style={{width: "600px", height: "400px"}}></div>
-            <ul>
-                {elements.map((item: any, index: any) => {
-                    return (
-                        <li key={index}>{item}</li>
-                    );
-                })}
-            </ul>
+            <p style={{color: '#888', fontSize: '15px'}}>
+                当useState造成数据变动后,Diff算法会找出更新/插入的节点,绘制淡蓝色边框以提示组件发生了重新渲染
+                如果没有妥善使用useCallBack/Memo,MiniReact会因为函数地址的变更认为组件变动,进行重绘
+            </p>
 
 
+            <section style={{marginTop: '2rem'}}>
+                <h2>📘 React 官方教程的井字棋游戏</h2>
+                <div className="game" style={{display: 'flex', justifyContent: 'center'}}>
+                    <div className="game-board">
+                        <Board xIsNext={xIsNext} squares={currentSquares} onPlay={handlePlay}/>
+                    </div>
+                </div>
+            </section>
+
+            <section style={{marginTop: '2rem'}}>
+                <h2>🎈 来试一下移动小球</h2>
+                <p style={{color: '#888', fontSize: '14px'}}>
+                    在鼠标移动这样的情况中控制台频繁输出会造成掉帧,建议关闭 Console 提升帧率
+                </p>
+                <div
+                    ref={divRef}
+                    onPointerMove={handlePointerMove}
+                    style={{
+                        position: 'relative',
+                        width: '40vw',
+                        height: '40vh',
+                        backgroundColor: '#f0f0f0',
+                        border: '1px solid #ddd',
+                        borderRadius: '12px',
+                        overflow: 'hidden',
+                        marginTop: '1rem',
+                    }}
+                >
+                    <div
+                        style={{
+                            position: 'absolute',
+                            backgroundColor: 'red',
+                            borderRadius: '50%',
+                            transform: `translate(${position.x - 10}px, ${position.y - 10}px)`,
+                            width: '20px',
+                            height: '20px',
+                            transition: 'transform 0.05s linear',
+                        }}
+                    />
+                </div>
+            </section>
+
+            <section style={{marginTop: '2rem'}}>
+                <h2>🧪 useRef与useCallBack/useMemo测试</h2>
+                <input ref={inputRef}
+                       style={{padding: '8px', border: '1px solid #ccc', borderRadius: '4px', width: '200px'}}/>
+                <button onClick={handleRef} style={{marginLeft: '1rem'}}>
+                    点击获取输入框内容
+                </button>
+                <div ref={chartRef} style={{width: '400px', height: '400px'}}></div>
+                <Parent/>
+            </section>
         </div>
     );
 }

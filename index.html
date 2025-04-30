@@ -70,11 +70,24 @@
     }
 
 
+    button {
+        padding: 0.5rem 1rem;
+        background-color: #0078d4;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+    }
+
+    button:hover {
+        background-color: #005fa3;
+    }
+
+    input:focus {
+        outline-color: #0078d4;
+    }
+
+
 </style>
-<script type="module">
-    window.addEventListener('DOMContentLoaded', async () => {
-        const { default: App } = await import('./src/App.tsx');
-        App();
-    });
-</script>
+<script type="module" src="./src/App.tsx"></script>
 </html>
