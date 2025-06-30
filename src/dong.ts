@@ -5,22 +5,26 @@ function createElement(type: string, props: any, ...children: any[]): any {
     if (type == undefined) {
         console.error("ERROR")
     }
+    const filter = children
+        .flat()
+        .filter(child => child != null && typeof child !== 'boolean');
     console.log({
         type,
         props: {
             ...props,
-            children: children.map(child =>
+            children: filter.map(child =>
                 typeof child === "object"
                     ? child
                     : createTextElement(child)
             ),
         }
     })
+
     return {
         type,
         props: {
             ...props,
-            children: children.map(child =>
+            children: filter.map(child =>
                 typeof child === "object"
                     ? child
                     : createTextElement(child)
@@ -322,12 +326,11 @@ function commitRoot() {
     deletions.forEach(commitWork);
     // 清空删除列表
     deletions = [];
+    // 提交渲染工作，更新 DOM
     commitWork(wipRoot.child);
-    // 执行所有副作用
-    runEffects(wipRoot.child);
-    // 在提交后更新 currentRoot
     currentRoot = wipRoot;
     wipRoot = null;
+    runEffects(currentRoot.child);
 }
 
 function runEffects(fiber: { hooks: any[]; child: any; sibling: any; }) {
@@ -336,6 +339,9 @@ function runEffects(fiber: { hooks: any[]; child: any; sibling: any; }) {
     if (fiber.hooks) {
         fiber.hooks.forEach((hook) => {
             if (hook.effect && hook.hasEffect) {
+                if (hook.cleanup) {
+                    hook.cleanup();
+                }
                 hook.cleanup = hook.effect();
                 hook.hasEffect = false;
             }
@@ -345,7 +351,6 @@ function runEffects(fiber: { hooks: any[]; child: any; sibling: any; }) {
     runEffects(fiber.child);
     runEffects(fiber.sibling);
 }
-
 
 //提交工作
 function commitWork(fiber: any): void {
@@ -427,6 +432,9 @@ const setAttribute = (dom: HTMLElement, key: string, value: any): void => {
     // 1. 如果属性名是 'children'，直接返回，不做任何处理
     if (key === 'children') {
         return;
+    }
+    else if (key === 'className') {
+        dom.setAttribute('class', value);
     }
 
     // 2. 如果属性名是 'nodeValue'，表示这是文本节点，直接设置元素的 textContent 为该值
@@ -573,40 +581,23 @@ export function useEffect(callback: Function, deps?: any[]) {
         currentFiber.alternate && currentFiber.alternate.hooks
             ? currentFiber.alternate.hooks[hookIndex]
             : null;
-    let hasChangedDeps;
 
+    let hasChangedDeps;
     if (!oldHook) {
-        //首次渲染 直接执行副作用
         hasChangedDeps = true;
     } else {
-        if (deps) {
-            //检查依赖项是否发生变化
-            hasChangedDeps = deps.some((dep, i) => {
-                return !Object.is(dep, oldHook.deps[i]);
-            });
-        } else {
-            // 如果没有传递依赖项数组 则每次都重新执行副作用
-            hasChangedDeps = true;
-        }
+        hasChangedDeps = deps ? deps.some((dep, i) => !Object.is(dep, oldHook.deps[i])) : true;
     }
 
-    // 保存当前 hook 的状态，包括依赖项、effect 和清理函数
     const hook = {
-        deps, // 当前的依赖项
-        effect: callback, // 副作用函数
-        cleanup: oldHook ? oldHook.cleanup : null, // 保存旧的清理函数
+        deps,
+        effect: callback,
+        cleanup: oldHook ? oldHook.cleanup : null,
+        hasEffect: hasChangedDeps,
     };
 
-    if (hasChangedDeps) {
-        if (hook.cleanup) {
-            hook.cleanup();
-        }
-        const cleanup = callback();
-        hook.cleanup = typeof cleanup === 'function' ? cleanup : null; // 保存清理函数
-    }
-
-    currentFiber.hooks.push(hook); // 将 hook 添加到当前 fiber 的 hooks 列表中
-    hookIndex++; // 更新 hookIndex，指向下一个 hook
+    currentFiber.hooks.push(hook);
+    hookIndex++;
 }
 
 // useMemo 实现
